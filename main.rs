@@ -1,5 +1,5 @@
 
-extern crate sdl;
+//extern crate sdl;
 use std::io::File;
 use cpu::Cpu;
 use std::io::println;
@@ -7,13 +7,13 @@ mod cpu;
 mod mem;
 
 fn main() {
-    sdl::init([sdl::InitVideo]);
-    sdl::wm::set_caption("rust-sdl demo - video", "rust-sdl");
-    let screen = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
-                                                                [sdl::video::DoubleBuf]) {
-        Ok(screen) => screen,
-        Err(err) => fail!("failed to set video mode: {}", err)
-    };
+    //sdl::init([sdl::InitVideo]);
+    //sdl::wm::set_caption("rust-sdl demo - video", "rust-sdl");
+    //let screen = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
+    //                                                            [sdl::video::DoubleBuf]) {
+    //    Ok(screen) => screen,
+    //    Err(err) => fail!("failed to set video mode: {}", err)
+    //};
 	let filename = std::os::args()[1];
 	let result = match File::open(&Path::new(filename)).read_to_end() {
 		Ok(r) => r,
@@ -30,8 +30,8 @@ fn main() {
 	let mut cpu = Cpu::new(rom_contents.to_owned());
 	cpu.run();
 
-    screen.flip();
-    sdl::quit();
+    //screen.flip();
+    //sdl::quit();
 }
 
 
