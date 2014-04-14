@@ -40,6 +40,9 @@ impl Mem {
 			self.writebyte(offset+i as u16, b);
 		}
 	}
+	pub fn read16(&self, offset : u16) -> u16 {
+		self.readbyte(offset+1) as u16 << 8 | self.readbyte(offset) as u16
+	}
 	fn write_u16(&mut self, offset : u16, value : u16) {
 		self.writebyte(offset as u16, (value & 0xFF) as u8);
 		self.writebyte(offset+1 as u16, (value >> 8) as u8);
