@@ -4,6 +4,7 @@ use std::io::println;
 
 pub struct Mem {
 	pub bank_n : u16,
+	pub mbc_type : int,
 	pub mem : [u8, ..0x10000],
 	pub rom : ~[u8],
 }
@@ -13,7 +14,11 @@ impl Mem {
 		if offset < 0x3FFF {
 			self.rom[offset as uint ]
 		} else if offset < 0x7FFF {
-			self.rom[(offset+0x4000*self.bank_n) as uint]
+			if self.mbc_type > 0 {
+				self.rom[(offset+0x4000*self.bank_n) as uint]
+			} else {
+				self.rom[offset as uint]
+			}
 		} else {
 			self.mem[offset as uint]
 		}
