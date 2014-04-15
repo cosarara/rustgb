@@ -339,13 +339,13 @@ impl Cpu {
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
 					 self.regs.af.v, self.regs.bc.v, self.regs.de.v, self.regs.hl.v,
 					 self.mem.read16(self.regs.sp.v));
-			println!("-6 {:04X} -4 {:04X} -2 {:04X} +0 {:04X} +2 {:04X} +4 {:04X}",
+			/*println!("-6 {:04X} -4 {:04X} -2 {:04X} +0 {:04X} +2 {:04X} +4 {:04X}",
 					 self.mem.read16(self.regs.hl.v-6),
 					 self.mem.read16(self.regs.hl.v-4),
 					 self.mem.read16(self.regs.hl.v-2),
 					 self.mem.read16(self.regs.hl.v),
 					 self.mem.read16(self.regs.hl.v+2),
-					 self.mem.read16(self.regs.hl.v+4));
+					 self.mem.read16(self.regs.hl.v+4));*/
 		}
 		match op {
 			0x00 => {},
@@ -393,8 +393,11 @@ impl Cpu {
 			0x1D => {let a = self.regs.de.dec_low(); self.decflags(a)},
 			0x1E => {self.regs.de.set_low(n); self.regs.pc.v += 1},
 			0x1F => {
-				let a = self.regs.af.get_high();
-				self.regs.af.set_high((a >> 1) | (a << 7));
+				let x = self.regs.af.get_high();
+				let b = x & 1;
+				let r = x >> 1 | (if self.check_carry_flag() {1} else {0}) << 7;
+				self.set_carry_flag(b == 1);
+				self.regs.af.set_high(r);
 			},
 			0x20 => if !self.check_zero_flag() {self.jr(n)} else {self.regs.pc.v += 1},
 			0x21 => {self.regs.pc.v += 2; self.regs.hl.v = nn},
@@ -518,9 +521,16 @@ impl Cpu {
 						s.set_carry_flag(a >> 7 == 1);
 						a
 					} else if n < 0x18 { // RL
-						(x << 1) | (x >> 7)
+						//(x << 1) | (x >> 7)
+						let b = x >> 7;
+						let r = x << 1 | (if s.check_carry_flag() {1} else {0});
+						s.set_carry_flag(b == 1);
+						r
 					} else if n < 0x20 { // RR
-						(x >> 1) | (x << 7)
+						let b = x & 1;
+						let r = x >> 1 | (if s.check_carry_flag() {1} else {0}) << 7;
+						s.set_carry_flag(b == 1);
+						r
 					} else if n < 0x28 { // SLA
 						x << 1
 					} else if n < 0x30 { // SRA
@@ -659,7 +669,7 @@ impl Cpu {
 			4 => 0x60,
 			_ => fail!("Interrupt codes go from 0 to 4"),
 		};
-		self.call(a);
+		self.call(a+1);
 	}
 }
 
