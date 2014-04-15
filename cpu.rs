@@ -43,11 +43,6 @@ impl Reg {
 		self.set_low(o+1);
 		(o, o+1)
 	}
-	fn inc(&mut self) -> (u16, u16) {
-		let o = self.v;
-		self.v = o+1;
-		(o, o+1)
-	}
 	fn dec_high(&mut self) -> (u8, u8) {
 		let o = self.get_high();
 		self.set_high(o-1);
@@ -56,11 +51,6 @@ impl Reg {
 	fn dec_low(&mut self) -> (u8, u8) {
 		let o = self.get_low();
 		self.set_low(o-1);
-		(o, o-1)
-	}
-	fn dec(&mut self) -> (u16, u16) {
-		let o = self.v;
-		self.v = o-1;
 		(o, o-1)
 	}
 	fn add_high(&mut self, v : u8) -> (u8, u8) {
@@ -123,7 +113,7 @@ impl Cpu {
 			clock : 0,
 			screen_mode : 0,
 			drawing : false,
-			interrupts_enabled : true,
+			interrupts_enabled : false,
 		}
 	}
 	fn ei(&mut self) {
@@ -143,10 +133,6 @@ impl Cpu {
 	}
 	// subtraction
 	fn cs8(&mut self, (old, new) : (u8, u8)) -> u8 {
-		self.set_carry_flag(new > old);
-		new
-	}
-	fn cs16(&mut self, (old, new) : (u16, u16)) -> u16 {
 		self.set_carry_flag(new > old);
 		new
 	}
@@ -184,12 +170,6 @@ impl Cpu {
 	fn decflags(&mut self, t : (u8, u8)) {
 		let r = self.cs8(t);
 		self.z8(r);
-		self.set_addsub_flag(false);
-	}
-
-	fn decflags16(&mut self, t : (u16, u16)) {
-		let r = self.cs16(t);
-		self.z16(r);
 		self.set_addsub_flag(false);
 	}
 
@@ -334,7 +314,7 @@ impl Cpu {
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
 		if std::os::args().len() > 2 {
-			println("");
+			//println("");
 			println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
 					 self.regs.af.v, self.regs.bc.v, self.regs.de.v, self.regs.hl.v,
@@ -351,7 +331,7 @@ impl Cpu {
 			0x00 => {},
 			0x01 => {self.regs.bc.v = nn; self.regs.pc.v += 2},
 			0x02 => {self.mem.writebyte(self.regs.bc.v, self.regs.af.get_high())},
-			0x03 => {let a = self.regs.bc.inc(); self.incflags16(a)},
+			0x03 => {self.regs.bc.v += 1},
 			0x04 => {let a = self.regs.bc.inc_high(); self.incflags(a)},
 			0x05 => {let a = self.regs.bc.dec_high(); self.decflags(a)},
 			0x06 => {self.regs.bc.set_high(n); self.regs.pc.v += 1},
@@ -377,7 +357,7 @@ impl Cpu {
 			0x10 => {fail!("STOP")},
 			0x11 => {self.regs.de.v = nn; self.regs.pc.v += 2},
 			0x12 => {self.mem.writebyte(self.regs.de.v, self.regs.af.get_high())},
-			0x13 => {let a = self.regs.de.inc(); self.incflags16(a)},
+			0x13 => {self.regs.de.v += 1},
 			0x14 => {let a = self.regs.de.inc_high(); self.incflags(a)},
 			0x15 => {let a = self.regs.de.dec_high(); self.decflags(a)},
 			0x16 => {self.regs.de.set_high(n); self.regs.pc.v += 1},
@@ -388,7 +368,7 @@ impl Cpu {
 			0x18 => self.jr(n),
 			0x19 => {let r = self.regs.hl.add(self.regs.de.v); self.addflags16(r)},
 			0x1A => {self.regs.af.set_high(self.mem.readbyte(self.regs.de.v))},
-			0x1B => {let f = self.regs.de.dec(); self.decflags16(f)},
+			0x1B => {self.regs.de.v -= 1},
 			0x1C => {let a = self.regs.de.inc_low(); self.incflags(a)},
 			0x1D => {let a = self.regs.de.dec_low(); self.decflags(a)},
 			0x1E => {self.regs.de.set_low(n); self.regs.pc.v += 1},
@@ -405,7 +385,7 @@ impl Cpu {
 				let addr = self.regs.hl.v;
 				self.mem.writebyte(addr, self.regs.af.get_high());
 				self.regs.hl.v += 1},
-			0x23 => {let a = self.regs.hl.inc(); self.incflags16(a)},
+			0x23 => {self.regs.hl.v += 1},
 			0x24 => {let a = self.regs.hl.inc_high(); self.incflags(a)},
 			0x25 => {let a = self.regs.hl.dec_high(); self.decflags(a)},
 			0x26 => {self.regs.hl.set_high(n); self.regs.pc.v += 1},
@@ -415,7 +395,7 @@ impl Cpu {
 				let addr = self.regs.hl.v;
 				self.regs.af.set_high(self.mem.readbyte(addr));
 				self.regs.hl.v += 1},
-			0x2B => {let f = self.regs.hl.dec(); self.decflags16(f)},
+			0x2B => {self.regs.hl.v -= 1},
 			0x2C => {let a = self.regs.hl.inc_low(); self.incflags(a)},
 			0x2D => {let a = self.regs.hl.dec_low(); self.decflags(a)},
 			0x2E => {self.regs.hl.set_low(n); self.regs.pc.v += 1},
@@ -428,7 +408,7 @@ impl Cpu {
 				let addr = self.regs.hl.v;
 				self.mem.writebyte(addr, self.regs.af.get_high());
 				self.regs.hl.v -= 1},
-			0x33 => {let a = self.regs.sp.inc(); self.incflags16(a)},
+			0x33 => {self.regs.sp.v += 1},
 			0x34 => {
 				let addr = self.regs.hl.v;
 				let a = self.mem.readbyte(addr);
@@ -444,7 +424,7 @@ impl Cpu {
 				self.regs.pc.v += 1},
 			0x38 => if self.check_carry_flag() {self.jr(n)} else {self.regs.pc.v += 1},
 			0x39 => {self.regs.hl.v += self.regs.sp.v},
-			0x3B => {let f = self.regs.sp.dec(); self.decflags16(f)},
+			0x3B => {self.regs.sp.v -= 1},
 			0x3C => {let a = self.regs.af.inc_high(); self.incflags(a)},
 			0x3D => {let a = self.regs.af.dec_high(); self.decflags(a)},
 			0x3E => {self.regs.af.set_high(n); self.regs.pc.v += 1},
