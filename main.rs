@@ -57,16 +57,14 @@ fn draw(screen : &Surface, vram : &[u8]) {
 }
 
 fn main() {
-	/*
     sdl::init([sdl::InitVideo]);
     sdl::wm::set_caption("rustgb", "rust-sdl");
-	*/
     //let screen : ~Surface = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
-    /*let screen : ~Surface = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
+    let screen : ~Surface = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
                                                                 [sdl::video::DoubleBuf]) {
         Ok(screen) => screen,
         Err(err) => fail!("failed to set video mode: {}", err)
-    };*/
+    };
 	let filename = std::os::args()[1];
 	let result = match File::open(&Path::new(filename)).read_to_end() {
 		Ok(r) => r,
@@ -84,11 +82,10 @@ fn main() {
 	'main : loop {
 		cpu.next();
 		if cpu.drawing {
-			//draw(screen, cpu.mem.mem.slice(0x8000, 0xA000));
-			//screen.flip();
+			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000));
+			screen.flip();
 			cpu.drawing = false;
 		}
-		/*
         'events : loop {
 			match sdl::event::poll_event() {
 				sdl::event::NoEvent => break 'events,
@@ -117,9 +114,8 @@ fn main() {
 				_ => {}
 			}
 		}
-		*/
 	}
-    //sdl::quit();
+    sdl::quit();
 }
 
 
