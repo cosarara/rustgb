@@ -68,13 +68,6 @@ impl Reg {
 		self.set_high(o+v);
 		(o, o+v)
 	}
-	/*
-	fn add_low(&mut self, v : u8) -> (u8, u8) {
-		let o = self.get_low();
-		self.set_low(o+v);
-		(o, o+v)
-	}
-	*/
 	fn add(&mut self, v : u16) -> (u16, u16) {
 		let o = self.v;
 		self.v = o+v;
@@ -86,18 +79,6 @@ impl Reg {
 		(o, o-v)
 	}
 
-	/*
-	fn sub_low(&mut self, v : u8) -> (u8, u8) {
-		let o = self.get_low();
-		self.set_low(o-v);
-		(o, o-v)
-	}
-	fn sub(&mut self, v : u16) -> (u16, u16) {
-		let o = self.v;
-		self.v = o-v;
-		(o, o-v)
-	}
-	*/
 	fn to_bytes(&self) -> ~[u8] {
 		~[self.get_high(), self.get_low()]
 	}
@@ -217,16 +198,10 @@ impl Cpu {
 		self.set_addsub_flag(true);
 	}
 
-	/*fn subflags16(&mut self, t : (u16, u16)) {
-		self.decflags16(t);
-		self.set_addsub_flag(true);
-	}*/
-
 	fn push(&mut self, v : u16) {
 		self.regs.sp.v -= 2;
 		let m : ~[u8] = ~[(v & 0xFF) as u8, (v >> 8) as u8];
 		self.mem.write(self.regs.sp.v, m);
-		//println!("{:02X}{:02X}", self.mem.readbyte(self.regs.sp.v+1), self.mem.readbyte(self.regs.sp.v))
 	}
 	fn pop(&mut self) -> u16 {
 		let mut r = self.mem.readbyte(self.regs.sp.v) as u16;
@@ -358,13 +333,11 @@ impl Cpu {
 		//	file.write(self.mem.mem);
 		//	fail!("quit")
 		//}
-		//let mut count = 0;
 		let op : u8 = self.mem.readbyte(self.regs.pc.v);
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
 		if std::os::args().len() > 2 {
 			println("");
-		//println!("PC: {:04X} OP: {:02X} N: {:02X} NN: {:04X} SP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 			println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
 					 self.regs.af.v, self.regs.bc.v, self.regs.de.v, self.regs.hl.v,
@@ -476,14 +449,6 @@ impl Cpu {
 			0x3D => {let a = self.regs.af.dec_high(); self.decflags(a)},
 			0x3E => {self.regs.af.set_high(n); self.regs.pc.v += 1},
 			
-			//0x66 => {self.regs.hl.set_high(self.mem.readbyte(self.regs.hl.v))},
-			//0x6F => {self.regs.hl.set_low(self.regs.af.get_high())},
-
-			//0x77 => {let addr = self.regs.hl.v;
-			//	self.mem.writebyte(addr, self.regs.af.get_high())},
-			//0x7D => {self.regs.af.set_high(self.regs.hl.get_low())},
-			//0x7E => {self.regs.af.set_high(self.mem.readbyte(self.regs.hl.v))},
-
 			0x40..0xBF => {
 				let b = match op & 0x7 {
 					0 => self.regs.bc.get_high(),
@@ -546,7 +511,6 @@ impl Cpu {
 			0xC9 => {self.ret()},
 			0xCA => if self.check_zero_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
 			0xCB => {
-				//println("WARNING: CB prefix instruction");
 				fn f(s : &mut Cpu, n: u8, x: u8) -> u8 {
 					if n < 0x8 { // RLC
 						let a = (x << 1) | (x >> 7);
@@ -644,7 +608,6 @@ impl Cpu {
 				self.regs.sp.v = r;
 				self.regs.pc.v += 1;},
 			0xE9 => { // Docs says its a jump to (hl), but seems it's jp hl
-				//let a = self.regs.hl.v; self.regs.pc.v = self.mem.read16(a)-1},
 				self.regs.pc.v = self.regs.hl.v-1},
 			0xEA => {
 				self.mem.writebyte(nn, self.regs.af.get_high());
