@@ -130,7 +130,8 @@ pub struct Cpu {
 	pub mem : Mem,
 	clock : uint,
 	screen_mode : int,
-	pub drawing : bool
+	pub drawing : bool,
+	interrupts_enabled : bool,
 }
 
 impl Cpu {
@@ -140,14 +141,15 @@ impl Cpu {
 			mem : Mem::new(rom),
 			clock : 0,
 			screen_mode : 0,
-			drawing : false
+			drawing : false,
+			interrupts_enabled : true,
 		}
 	}
 	fn ei(&mut self) {
-		println("Warning: EI not implemented");
+		self.interrupts_enabled = true
 	}
 	fn di(&mut self) {
-		println("Warning: DI not implemented");
+		self.interrupts_enabled = false
 	}
 	// Tests for carry
 	fn ca8(&mut self, (old, new) : (u8, u8)) -> u8 {
@@ -306,36 +308,41 @@ impl Cpu {
 	}
 	fn run_clock(&mut self) {
 		self.clock += 4; // TODO: precise cycles
-		let line = &mut self.mem.mem[0xff44];
+		// self.mem.mem[0xff44] holds the line number
 		match self.screen_mode {
+			// HBlank
 			0 => {
 				if self.clock >= 204 {
 					self.clock = 0;
-					*line += 1;
-					if *line == 143 {
+					self.mem.mem[0xff44] += 1;
+					if self.mem.mem[0xff44] == 143 {
 						self.drawing = true;
-						self.screen_mode = 1;
+						self.screen_mode = 1; // Finish, go to VBlank
+						self.interrupt(0);
 					} else {
 						self.screen_mode = 2;
 					}
 				}
 			},
+			// VBlank
 			1 => {
 				if self.clock >= 456 {
 					self.clock = 0;
-					*line += 1;
-					if *line > 153 {
+					self.mem.mem[0xff44] += 1;
+					if self.mem.mem[0xff44] > 153 {
 						self.screen_mode = 2;
-						*line = 0;
+						self.mem.mem[0xff44] = 0;
 					}
 				}
 			},
+			// OAM Read
 			2 => {
 				if self.clock >= 80 {
 					self.clock = 0;
 					self.screen_mode = 3;
 				}
 			},
+			// VRAM Read
 			3 => {
 				if self.clock >= 172 {
 					self.clock = 0;
@@ -496,8 +503,11 @@ impl Cpu {
 					0x58..0x5F => self.regs.de.set_low(b),
 					0x60..0x67 => self.regs.hl.set_high(b),
 					0x68..0x6F => self.regs.hl.set_low(b),
-					0x70..0x77 => if op == 0x76 {self.halt()}
-						else {self.mem.writebyte(self.regs.hl.v, b)},
+					0x70..0x77 => if op == 0x76 {
+						self.regs.pc.v -= 1; // Just wait here ok?
+					} else {
+						self.mem.writebyte(self.regs.hl.v, b)
+					},
 					0x78..0x7F => self.regs.af.set_high(b),
 					0x80..0x87 => {
 						let f = self.regs.af.add_high(b);
@@ -531,6 +541,7 @@ impl Cpu {
 				let f = self.regs.af.add_high(n);
 				self.addflags(f);
 				self.regs.pc.v += 1},
+			0xC7 => self.call(0),
 			0xC8 => {if self.check_zero_flag() {self.ret()}},
 			0xC9 => {self.ret()},
 			0xCA => if self.check_zero_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
@@ -590,6 +601,7 @@ impl Cpu {
 				let f = self.regs.af.add_high(n+c);
 				self.addflags(f);
 				self.regs.pc.v += 1},
+			0xCF => self.call(0x08),
 			0xD0 => {if !self.check_carry_flag() {self.ret()}},
 			0xD1 => {self.regs.de.v = self.pop()},
 			0xD2 => if !self.check_carry_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
@@ -600,6 +612,7 @@ impl Cpu {
 				let f = self.regs.af.sub_high(n);
 				self.subflags(f);
 				self.regs.pc.v += 1},
+			0xD7 => self.call(0x10),
 			0xD8 => {if self.check_carry_flag() {self.ret()}},
 			0xD9 => {self.ei(); self.ret()},
 			0xDA => if self.check_carry_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
@@ -611,17 +624,21 @@ impl Cpu {
 				let c = self.check_carry_flag();
 				let f = self.regs.af.sub_high(n-c as u8);
 				self.subflags(f)},
-			// RST
+			0xDF => self.call(0x18),
 			0xE0 => {
-				let mut addr : u16 = 0xFF00;
-				addr += n as u16;
+				let addr : u16 = 0xFF00 + n as u16;
 				self.mem.writebyte(addr, self.regs.af.get_high());
 				self.regs.pc.v += 1;
 			},
 			0xE1 => {self.regs.hl.v = self.pop()},
+			0xE2 => {
+				let addr : u16 = 0xFF00 + self.regs.bc.get_high() as u16;
+				self.mem.writebyte(addr, self.regs.af.get_high());
+			},
 			// E3 and E4 do not exist
 			0xE5 => {self.push(self.regs.hl.v)},
 			0xE6 => {self.and(n); self.regs.pc.v += 1},
+			0xE7 => self.call(0x20),
 			0xE8 => {
 				let r = (self.regs.sp.v as i16 + sign(n) as i16) as u16;
 				self.regs.sp.v = r;
@@ -635,19 +652,22 @@ impl Cpu {
 			},
 			// EB, EC and ED do not exist
 			0xEE => {self.xor(n); self.regs.pc.v += 1},
-			// RST
+			0xEF => self.call(0x28),
 			0xF0 => {
-				let mut addr : u16 = 0xFF00;
-				addr += n as u16;
+				let addr : u16 = 0xFF00 + n as u16;
 				self.regs.af.set_high(self.mem.readbyte(addr));
 				self.regs.pc.v += 1;
 			},
 			0xF1 => {self.regs.af.v = self.pop()},
+			0xF2 => {
+				let addr : u16 = 0xFF00 + self.regs.bc.get_high() as u16;
+				self.regs.af.set_high(self.mem.readbyte(addr));
+			},
 			0xF3 => {self.di()},
 			// F4 does not exist
 			0xF5 => {self.push(self.regs.af.v)},
 			0xF6 => {self.or(n); self.regs.pc.v += 1},
-			// RST
+			0xF7 => self.call(0x30),
 			0xF8 => {
 				let r = (self.regs.sp.v as i16 + sign(n) as i16) as u16;
 				self.regs.hl.v = r;
@@ -660,11 +680,26 @@ impl Cpu {
 			0xFB => self.ei(),
 			// FC and FD do not exist
 			0xFE => {self.regs.pc.v += 1; self.cp(n)},
+			0xFF => self.call(0x38),
 			_ => {fail!("Unimplemented OP: {:X}h", op)},
 		}
 
 		self.regs.pc.v += 1;
 		self.run_clock();
+	}
+	pub fn interrupt(&mut self, n : u8) {
+		if !self.interrupts_enabled {
+			return;
+		}
+		let a = match n {
+			0 => 0x40,
+			1 => 0x48,
+			2 => 0x50,
+			3 => 0x58,
+			4 => 0x60,
+			_ => fail!("Interrupt codes go from 0 to 4"),
+		};
+		self.call(a);
 	}
 }
 
