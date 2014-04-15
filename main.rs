@@ -57,14 +57,16 @@ fn draw(screen : &Surface, vram : &[u8]) {
 }
 
 fn main() {
+	/*
     sdl::init([sdl::InitVideo]);
     sdl::wm::set_caption("rustgb", "rust-sdl");
+	*/
     //let screen : ~Surface = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
-    let screen : ~Surface = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
+    /*let screen : ~Surface = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
                                                                 [sdl::video::DoubleBuf]) {
         Ok(screen) => screen,
         Err(err) => fail!("failed to set video mode: {}", err)
-    };
+    };*/
 	let filename = std::os::args()[1];
 	let result = match File::open(&Path::new(filename)).read_to_end() {
 		Ok(r) => r,
@@ -82,22 +84,42 @@ fn main() {
 	'main : loop {
 		cpu.next();
 		if cpu.drawing {
-			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000));
-			screen.flip();
+			//draw(screen, cpu.mem.mem.slice(0x8000, 0xA000));
+			//screen.flip();
 			cpu.drawing = false;
 		}
+		/*
         'events : loop {
 			match sdl::event::poll_event() {
 				sdl::event::NoEvent => break 'events,
 				sdl::event::QuitEvent => break 'main,
-				//sdl::event::KeyEvent(k, _, _, _)
-				//	if k == sdl::event::EscapeKey
-				//		=> break 'main,
+				sdl::event::KeyEvent(k, p, _, _) => {
+					if k == sdl::event::EscapeKey {
+						break 'main
+					} else if k == sdl::event::ReturnKey {
+						cpu.mem.kstart = p
+					} else if k == sdl::event::BackspaceKey {
+						cpu.mem.kselect = p
+					} else if k == sdl::event::ZKey {
+						cpu.mem.ka = p
+					} else if k == sdl::event::XKey {
+						cpu.mem.kb = p
+					} else if k == sdl::event::UpKey {
+						cpu.mem.kup = p
+					} else if k == sdl::event::DownKey {
+						cpu.mem.kdown = p
+					} else if k == sdl::event::RightKey {
+						cpu.mem.kright = p
+					} else if k == sdl::event::LeftKey {
+						cpu.mem.kleft = p
+					}
+				},
 				_ => {}
 			}
 		}
+		*/
 	}
-    sdl::quit();
+    //sdl::quit();
 }
 
 
