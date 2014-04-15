@@ -278,9 +278,6 @@ impl Cpu {
 	fn jr(&mut self, v : u8) {
 		self.regs.pc.v = (self.regs.pc.v as i16 + sign(v) as i16) as u16 + 1;
 	}
-	fn halt(&mut self) {
-		fail!("halt, unimplemented")
-	}
 	fn run_clock(&mut self) {
 		self.clock += 4; // TODO: precise cycles
 		// self.mem.mem[0xff44] holds the line number
