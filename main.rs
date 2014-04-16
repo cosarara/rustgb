@@ -9,7 +9,7 @@ use std::io::println;
 mod cpu;
 mod mem;
 
-fn draw(screen : &Surface, vram : &[u8]) {
+fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 	fn putpixel(screen : &Surface, x : i16, y : i16, color : Color) {
 		// Stupid implementation, but I don't want to fight C and unsafety now
 		screen.fill_rect(Some(sdl::Rect {
@@ -24,8 +24,9 @@ fn draw(screen : &Surface, vram : &[u8]) {
         Err(err) => fail!("failed to set video mode: {}", err)
 	};
 	let cols = 16;
+	let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
 	for tile in range(0, 255) {
-		let taddr = tile * 16;
+		let taddr = tile * 16 + base_tiledata_addr;
 		for line in range(0, 8) {
 			let laddr = (taddr + 2*line) as uint;
 			for pixel in range(0, 8) {
@@ -42,9 +43,10 @@ fn draw(screen : &Surface, vram : &[u8]) {
 			}
 		}
 	}
+	let base_bgmap_addr = if lcdc >> 3 & 1 == 0 { 0x1800 } else { 0x1C00 };
 	for row in range(0, 32) {
 		for cell_n in range(0, 32) {
-			let addr = (0x1800+row*32+cell_n) as uint;
+			let addr = (base_bgmap_addr+row*32+cell_n) as uint;
 			let tile_n = vram[addr] as i16;
 			let sx = tile_n%(cols as i16)*8;
 			let sy = tile_n/(cols as i16)*8;
@@ -77,12 +79,14 @@ fn main() {
 	};
 	println(game_title);
 	let cart_type = rom_contents[0x147];
-	println!("cart type: {}", cart_type);
+	println!("cart type: {:X}", cart_type);
 	let mut cpu = Cpu::new(rom_contents.to_owned());
 	'main : loop {
 		cpu.next();
-		if cpu.drawing {
-			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000));
+		cpu.interrupts();
+		let lcdc = cpu.mem.readbyte(0xFF40);
+		if cpu.drawing && lcdc >> 7 == 1 {
+			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
 			screen.flip();
 			cpu.drawing = false;
 		}

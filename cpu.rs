@@ -63,6 +63,12 @@ impl Reg {
 		self.v = o+v;
 		(o, o+v)
 	}
+	fn addi8(&mut self, v : i8) -> (u16, u16) {
+		let o = self.v;
+		let r = (o as i16 + v as i16) as u16;
+		self.v = r;
+		(o, r)
+	}
 	fn sub_high(&mut self, v : u8) -> (u8, u8) {
 		let o = self.get_high();
 		self.set_high(o-v);
@@ -70,7 +76,7 @@ impl Reg {
 	}
 
 	fn to_bytes(&self) -> ~[u8] {
-		~[self.get_high(), self.get_low()]
+		~[self.get_low(), self.get_high()]
 	}
 }
 
@@ -149,33 +155,42 @@ impl Cpu {
 		let r = self.ca8(t);
 		self.z8(r);
 		self.set_addsub_flag(false);
+		let (a, _) = t;
+		self.set_hc_flag((a&0xF) == 0);
 	}
 
 	fn incflags16(&mut self, t : (u16, u16)) {
-		let r = self.ca16(t);
-		self.z16(r);
-		self.set_addsub_flag(false);
+		//let r = self.ca16(t);
+		//self.z16(r);
+		//self.set_addsub_flag(false);
 	}
 
 	fn addflags(&mut self, t : (u8, u8)) {
 		self.incflags(t);
 		self.set_addsub_flag(true);
+		let (a, f) = t;
+		self.set_hc_flag(((f&0xF) < (a&0xF)));
 	}
 
 	fn addflags16(&mut self, t : (u16, u16)) {
-		self.incflags16(t);
-		self.set_addsub_flag(true);
+		let r = self.ca16(t);
+		//self.incflags16(t);
+		self.set_addsub_flag(false); // Yes, really
 	}
 
 	fn decflags(&mut self, t : (u8, u8)) {
 		let r = self.cs8(t);
 		self.z8(r);
 		self.set_addsub_flag(false);
+		let (a, _) = t;
+		self.set_hc_flag((a&0xF) == 0xF);
 	}
 
 	fn subflags(&mut self, t : (u8, u8)) {
 		self.decflags(t);
 		self.set_addsub_flag(true);
+		let (a, f) = t;
+		self.set_hc_flag(((a&0xF) < (f&0xF)));
 	}
 
 	fn push(&mut self, v : u16) {
@@ -254,6 +269,8 @@ impl Cpu {
 		let a = self.regs.af.get_high();
 		self.set_zero_flag(a == v);
 		self.set_carry_flag(a < v);
+		self.set_addsub_flag(true);
+		self.set_hc_flag(a&0xf < (a-v)&0xf);
 	}
 	fn jr(&mut self, v : u8) {
 		self.regs.pc.v = (self.regs.pc.v as i16 + sign(v) as i16) as u16 + 1;
@@ -270,7 +287,7 @@ impl Cpu {
 					if self.mem.mem[0xff44] == 143 {
 						self.drawing = true;
 						self.screen_mode = 1; // Finish, go to VBlank
-						self.interrupt(0);
+						self.request_interrupt(0);
 					} else {
 						self.screen_mode = 2;
 					}
@@ -341,7 +358,12 @@ impl Cpu {
 				self.set_carry_flag(b & 1 == 1);
 				self.regs.af.set_high(b)
 			},
-			0x08 => {self.mem.write(nn, self.regs.sp.to_bytes()); self.regs.pc.v += 2},
+			0x08 => {
+				self.mem.write(nn, self.regs.sp.to_bytes());
+				//let a = self.mem.readbyte(nn);
+				//let b = self.mem.readbyte(nn+1);
+				//fail!("08: {:X} {:X} {:X}", a, b, self.regs.sp.v);
+				self.regs.pc.v += 2},
 			0x09 => {self.regs.hl.v += self.regs.bc.v},
 			0x0A => {self.regs.af.set_high(self.mem.readbyte(self.regs.bc.v))},
 			0x0B => {self.regs.bc.v -= 1},
@@ -423,7 +445,7 @@ impl Cpu {
 				self.mem.writebyte(addr, n);
 				self.regs.pc.v += 1},
 			0x38 => if self.check_carry_flag() {self.jr(n)} else {self.regs.pc.v += 1},
-			0x39 => {self.regs.hl.v += self.regs.sp.v},
+			0x39 => {let r = self.regs.hl.add(self.regs.sp.v); self.addflags16(r)},
 			0x3B => {self.regs.sp.v -= 1},
 			0x3C => {let a = self.regs.af.inc_high(); self.incflags(a)},
 			0x3D => {let a = self.regs.af.dec_high(); self.decflags(a)},
@@ -472,13 +494,13 @@ impl Cpu {
 					0xA8..0xAF => {self.xor(b)}
 					0xB0..0xB7 => {self.or(b)}
 					0xB8..0xBF => {self.cp(b)}
-					_ => fail!("crash and burn : {:X}", n)
+					_ => fail!("crash and burn : {:X}", op)
 				}
 			},
 
 			0xC0 => {if !self.check_zero_flag() {self.ret()}},
 			0xC1 => {self.regs.bc.v = self.pop()},
-			0xC2 => if !self.check_zero_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
+			0xC2 => if !self.check_zero_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			0xC3 => {self.regs.pc.v = nn-1},
 			0xC4 => {self.regs.pc.v += 2; if !self.check_zero_flag() {self.call(nn)}},
 			0xC5 => {self.push(self.regs.bc.v)},
@@ -489,7 +511,7 @@ impl Cpu {
 			0xC7 => self.call(0),
 			0xC8 => {if self.check_zero_flag() {self.ret()}},
 			0xC9 => {self.ret()},
-			0xCA => if self.check_zero_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
+			0xCA => if self.check_zero_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			0xCB => {
 				fn f(s : &mut Cpu, n: u8, x: u8) -> u8 {
 					if n < 0x8 { // RLC
@@ -512,21 +534,34 @@ impl Cpu {
 						s.set_carry_flag(b == 1);
 						r
 					} else if n < 0x28 { // SLA
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						x << 1
 					} else if n < 0x30 { // SRA
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						x >> 1
 					} else if n < 0x38 { // SWAP
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						x << 4 | x >> 4
 					} else if n < 0x40 { // SRL
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						x >> 1
 					} else if n < 0x80 { // BIT
-						let b = n >> 3; let c = (x >> b) & 1;
+						let b = n >> 3 & 7;
+						let c = (x >> b) & 1;
 						s.set_zero_flag(c != 1);
+						s.set_addsub_flag(false);
+						s.set_hc_flag(true);
 						c
 					} else if n < 0xC0 { // RES
-						let b = ((n >> 3) & 0xF)-1; x & (0xFF ^ (1 << b))
+						let b = (n >> 3) & 0xF;
+						x & (0xFF ^ (1 << b))
 					} else { // SET
-						let b = ((n >> 3) & 0xF)-1; x | (1 << b)
+						let b = (n >> 3) & 0xF;
+						x | (1 << b)
 					}
 				}
 				match n & 7 {
@@ -555,7 +590,7 @@ impl Cpu {
 			0xCF => self.call(0x08),
 			0xD0 => {if !self.check_carry_flag() {self.ret()}},
 			0xD1 => {self.regs.de.v = self.pop()},
-			0xD2 => if !self.check_carry_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
+			0xD2 => if !self.check_carry_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			// D3 does not exist
 			0xD4 => {self.regs.pc.v += 2; if !self.check_carry_flag() {self.call(nn)}},
 			0xD5 => {self.push(self.regs.de.v)},
@@ -566,7 +601,7 @@ impl Cpu {
 			0xD7 => self.call(0x10),
 			0xD8 => {if self.check_carry_flag() {self.ret()}},
 			0xD9 => {self.ei(); self.ret()},
-			0xDA => if self.check_carry_flag() {self.regs.pc.v = nn} else {self.regs.pc.v += 2},
+			0xDA => if self.check_carry_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			// DB does not exist
 			0xDC => {self.regs.pc.v += 2; if self.check_carry_flag() {self.call(nn)}},
 			// DD does not exist
@@ -583,7 +618,7 @@ impl Cpu {
 			},
 			0xE1 => {self.regs.hl.v = self.pop()},
 			0xE2 => {
-				let addr : u16 = 0xFF00 + self.regs.bc.get_high() as u16;
+				let addr : u16 = 0xFF00 + self.regs.bc.get_low() as u16;
 				self.mem.writebyte(addr, self.regs.af.get_high());
 			},
 			// E3 and E4 do not exist
@@ -591,8 +626,9 @@ impl Cpu {
 			0xE6 => {self.and(n); self.regs.pc.v += 1},
 			0xE7 => self.call(0x20),
 			0xE8 => {
-				let r = (self.regs.sp.v as i16 + sign(n) as i16) as u16;
-				self.regs.sp.v = r;
+				let r = self.regs.sp.addi8(sign(n));
+				self.addflags16(r);
+				self.set_zero_flag(false);
 				self.regs.pc.v += 1;},
 			0xE9 => { // Docs says its a jump to (hl), but seems it's jp hl
 				self.regs.pc.v = self.regs.hl.v-1},
@@ -610,7 +646,7 @@ impl Cpu {
 			},
 			0xF1 => {self.regs.af.v = self.pop()},
 			0xF2 => {
-				let addr : u16 = 0xFF00 + self.regs.bc.get_high() as u16;
+				let addr : u16 = 0xFF00 + self.regs.bc.get_low() as u16;
 				self.regs.af.set_high(self.mem.readbyte(addr));
 			},
 			0xF3 => {self.di()},
@@ -619,7 +655,10 @@ impl Cpu {
 			0xF6 => {self.or(n); self.regs.pc.v += 1},
 			0xF7 => self.call(0x30),
 			0xF8 => {
-				let r = (self.regs.sp.v as i16 + sign(n) as i16) as u16;
+				let o = self.regs.sp.v;
+				let r = (o as i16 + sign(n) as i16) as u16;
+				self.addflags16((o, r));
+				self.set_zero_flag(false);
 				self.regs.hl.v = r;
 				self.regs.pc.v += 1;},
 			0xF9 => {self.regs.sp.v = self.regs.hl.v},
@@ -637,19 +676,32 @@ impl Cpu {
 		self.regs.pc.v += 1;
 		self.run_clock();
 	}
-	pub fn interrupt(&mut self, n : u8) {
-		if !self.interrupts_enabled {
-			return;
+	pub fn request_interrupt(&mut self, n : u8) {
+		let f = self.mem.readbyte(0xFF0F);
+		self.mem.writebyte(0xFF0F, f | 1 << n);
+	}
+	pub fn interrupts(&mut self) {
+		for n in range(0, 4) {
+			if !self.interrupts_enabled {
+				return;
+			}
+			let a = match n {
+				0 => 0x40,
+				1 => 0x48,
+				2 => 0x50,
+				3 => 0x58,
+				4 => 0x60,
+				_ => fail!("Interrupt codes go from 0 to 4"),
+			};
+			let e = self.mem.readbyte(0xFFFF);
+			let f = self.mem.readbyte(0xFF0F);
+			if (f & e) >> n & 1 != 1 {
+				continue;
+			}
+			self.mem.writebyte(0xFF0F, f ^ 1 << n);
+			self.call(a+1);
+			break;
 		}
-		let a = match n {
-			0 => 0x40,
-			1 => 0x48,
-			2 => 0x50,
-			3 => 0x58,
-			4 => 0x60,
-			_ => fail!("Interrupt codes go from 0 to 4"),
-		};
-		self.call(a+1);
 	}
 }
 
