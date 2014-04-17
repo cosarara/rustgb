@@ -176,6 +176,8 @@ impl Cpu {
 		let r = self.ca16(t);
 		//self.incflags16(t);
 		self.set_addsub_flag(false); // Yes, really
+		let (a, f) = t;
+		self.set_hc_flag(((f&0xFFF) < (a&0xFFF)));
 	}
 
 	fn decflags(&mut self, t : (u8, u8)) {
@@ -253,16 +255,25 @@ impl Cpu {
 	fn and(&mut self, v : u8) {
 		let a = self.regs.af.get_high() & v;
 		self.set_zero_flag(a == 0);
+		self.set_carry_flag(false);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(true);
 		self.regs.af.set_high(a)
 	}
 	fn or(&mut self, v : u8) {
 		let a = self.regs.af.get_high() | v;
 		self.set_zero_flag(a == 0);
+		self.set_carry_flag(false);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
 		self.regs.af.set_high(a)
 	}
 	fn xor(&mut self, v : u8) {
 		let a = self.regs.af.get_high() ^ v;
 		self.set_zero_flag(a == 0);
+		self.set_carry_flag(false);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
 		self.regs.af.set_high(a)
 	}
 	fn cp(&mut self, v : u8) {
@@ -364,7 +375,7 @@ impl Cpu {
 				//let b = self.mem.readbyte(nn+1);
 				//fail!("08: {:X} {:X} {:X}", a, b, self.regs.sp.v);
 				self.regs.pc.v += 2},
-			0x09 => {self.regs.hl.v += self.regs.bc.v},
+			0x09 => {let r = self.regs.hl.add(self.regs.bc.v); self.addflags16(r)},
 			0x0A => {self.regs.af.set_high(self.mem.readbyte(self.regs.bc.v))},
 			0x0B => {self.regs.bc.v -= 1},
 			0x0C => {let a = self.regs.bc.inc_low(); self.incflags(a)},
@@ -444,13 +455,27 @@ impl Cpu {
 			0x36 => {let addr = self.regs.hl.v;
 				self.mem.writebyte(addr, n);
 				self.regs.pc.v += 1},
+			0x37 => {
+				self.set_carry_flag(true);
+				self.set_addsub_flag(false);
+				self.set_hc_flag(false);
+			},
 			0x38 => if self.check_carry_flag() {self.jr(n)} else {self.regs.pc.v += 1},
 			0x39 => {let r = self.regs.hl.add(self.regs.sp.v); self.addflags16(r)},
+			0x3A => {
+				let addr = self.regs.hl.v;
+				self.regs.af.set_high(self.mem.readbyte(addr));
+				self.regs.hl.v -= 1},
 			0x3B => {self.regs.sp.v -= 1},
 			0x3C => {let a = self.regs.af.inc_high(); self.incflags(a)},
 			0x3D => {let a = self.regs.af.dec_high(); self.decflags(a)},
 			0x3E => {self.regs.af.set_high(n); self.regs.pc.v += 1},
-			
+			0x3F => {
+				let c = self.check_carry_flag();
+				self.set_carry_flag(!c);
+				self.set_addsub_flag(false);
+				self.set_hc_flag(false);
+			},
 			0x40..0xBF => {
 				let b = match op & 0x7 {
 					0 => self.regs.bc.get_high(),
@@ -517,30 +542,48 @@ impl Cpu {
 					if n < 0x8 { // RLC
 						let a = (x << 1) | (x >> 7);
 						s.set_carry_flag(a & 1 == 1);
+						s.set_zero_flag(a == 0);
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						a
 					} else if n < 0x10 { // RRC
 						let a = (x >> 1) | (x << 7);
 						s.set_carry_flag(a >> 7 == 1);
+						s.set_zero_flag(a == 0);
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						a
 					} else if n < 0x18 { // RL
 						//(x << 1) | (x >> 7)
 						let b = x >> 7;
 						let r = x << 1 | (if s.check_carry_flag() {1} else {0});
 						s.set_carry_flag(b == 1);
+						s.set_zero_flag(r == 0);
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						r
 					} else if n < 0x20 { // RR
 						let b = x & 1;
 						let r = x >> 1 | (if s.check_carry_flag() {1} else {0}) << 7;
 						s.set_carry_flag(b == 1);
+						s.set_zero_flag(r == 0);
+						s.set_addsub_flag(false);
+						s.set_hc_flag(false);
 						r
 					} else if n < 0x28 { // SLA
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
-						x << 1
+						let r = x << 1;
+						s.set_carry_flag(r >> 7 == 1);
+						s.set_zero_flag(r == 0);
+						r
 					} else if n < 0x30 { // SRA
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
-						x >> 1
+						let r = x >> 1;
+						s.set_carry_flag(r & 1 == 1);
+						s.set_zero_flag(r == 0);
+						r
 					} else if n < 0x38 { // SWAP
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
