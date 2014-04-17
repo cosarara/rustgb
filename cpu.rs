@@ -167,7 +167,7 @@ impl Cpu {
 
 	fn addflags(&mut self, t : (u8, u8)) {
 		self.incflags(t);
-		self.set_addsub_flag(true);
+		self.set_addsub_flag(false);
 		let (a, f) = t;
 		self.set_hc_flag(((f&0xF) < (a&0xF)));
 	}
@@ -505,9 +505,11 @@ impl Cpu {
 						let f = self.regs.af.add_high(b);
 						self.addflags(f)},
 					0x88..0x8F => { //ADC
-						let c = self.check_carry_flag();
-						let f = self.regs.af.add_high(b+c as u8);
-						self.addflags(f)},
+						let c = self.check_carry_flag() as u8;
+						let a = self.regs.af.get_high();
+						let f = self.regs.af.add_high(b+c);
+						self.addflags(f);
+						self.set_hc_flag(a & 0xF + b & 0xF + c > 0xF);},
 					0x90..0x97 => {
 						let f = self.regs.af.sub_high(b);
 						self.subflags(f)},
@@ -627,8 +629,10 @@ impl Cpu {
 			0xCD => {self.regs.pc.v += 2; self.call(nn)},
 			0xCE => {
 				let c = self.check_carry_flag() as u8;
+				let a = self.regs.af.get_high();
 				let f = self.regs.af.add_high(n+c);
 				self.addflags(f);
+				self.set_hc_flag(a & 0xF + n & 0xF + c > 0xF);
 				self.regs.pc.v += 1},
 			0xCF => self.call(0x08),
 			0xD0 => {if !self.check_carry_flag() {self.ret()}},
@@ -687,7 +691,10 @@ impl Cpu {
 				self.regs.af.set_high(self.mem.readbyte(addr));
 				self.regs.pc.v += 1;
 			},
-			0xF1 => {self.regs.af.v = self.pop()},
+			0xF1 => {
+				self.regs.af.v = self.pop();
+				self.regs.af.v &= 0xFFF0;
+			},
 			0xF2 => {
 				let addr : u16 = 0xFF00 + self.regs.bc.get_low() as u16;
 				self.regs.af.set_high(self.mem.readbyte(addr));
