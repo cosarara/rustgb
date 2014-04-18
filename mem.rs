@@ -20,6 +20,7 @@ pub struct Mem {
 	pub kb : bool,
 	pub kselect : bool,
 	pub kstart : bool,
+	pub ime_delay : u8,
 }
 
 impl Mem {
@@ -59,6 +60,7 @@ impl Mem {
 			kb : false,
 			kselect : false,
 			kstart : false,
+			ime_delay : 0,
 		}
 	}
 	pub fn rom_bank(&self) -> u16 {
@@ -126,6 +128,7 @@ impl Mem {
 		}
 	}
 	pub fn writebyte(&mut self, offset : u16, value : u8) {
+		//println!("Written {:X} to {:X}", value, offset);
 		let mtype = self.mbc_type;
 		if offset < 0x2000 {
 			if mtype == 1 || mtype == 5 {
@@ -177,11 +180,11 @@ impl Mem {
 				let c = ~[self.mem[0xFF01]];
 				let cs = match from_utf8(c) {
 					Some(g) => g,
-					None => fail!("Couldn't decode game title")
+					None => fail!("Couldn't decode character")
 				};
 				let mut stde = stderr();
 				stde.write_str(cs);
-				self.request_interrupt(2);
+				self.request_interrupt(3);
 			}
 		} else {
 			self.mem[offset as uint] = value;

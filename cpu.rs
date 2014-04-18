@@ -109,6 +109,8 @@ pub struct Cpu {
 	screen_mode : int,
 	pub drawing : bool,
 	interrupts_enabled : bool,
+	last_op : u8,
+	halted : bool,
 }
 
 impl Cpu {
@@ -120,13 +122,15 @@ impl Cpu {
 			screen_mode : 0,
 			drawing : false,
 			interrupts_enabled : false,
+			last_op : 0,
+			halted : false,
 		}
 	}
 	fn ei(&mut self) {
-		self.interrupts_enabled = true
+		self.mem.ime_delay = 2;
 	}
 	fn di(&mut self) {
-		self.interrupts_enabled = false
+		self.interrupts_enabled = false;
 	}
 	// Tests for carry
 	fn ca8(&mut self, (old, new) : (u8, u8)) -> u8 {
@@ -251,6 +255,11 @@ impl Cpu {
 		self.push(self.regs.pc.v+1);
 		self.regs.pc.v = v-1;
 	}
+	fn call_interrupt(&mut self, v : u16) {
+		let r = self.regs.pc.v + if self.halted {1} else {0};
+		self.push(r);
+		self.regs.pc.v = v;
+	}
 	fn ret(&mut self) {
 		self.regs.pc.v = self.pop()-1;
 	}
@@ -332,7 +341,7 @@ impl Cpu {
 	fn jr(&mut self, v : u8) {
 		self.regs.pc.v = (self.regs.pc.v as i16 + sign(v) as i16) as u16 + 1;
 	}
-	fn run_clock(&mut self) {
+	pub fn run_clock(&mut self) {
 		self.clock += 4; // TODO: precise cycles
 		// self.mem.mem[0xff44] holds the line number
 		match self.screen_mode {
@@ -398,6 +407,7 @@ impl Cpu {
 			if tclock % a == 0 {
 				count += 1;
 				if count == 0 {
+					//println("int 50");
 					self.mem.request_interrupt(2);
 					count = self.mem.readbyte(0xFF06);
 				}
@@ -414,7 +424,7 @@ impl Cpu {
 		let op : u8 = self.mem.readbyte(self.regs.pc.v);
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
-		if std::os::args().len() > 2 {
+		if std::os::args().len() > 2 && !(op == 0x76 && self.last_op == 0x76) {
 			//println("");
 			println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
@@ -590,7 +600,13 @@ impl Cpu {
 					0x60..0x67 => self.regs.hl.set_high(b),
 					0x68..0x6F => self.regs.hl.set_low(b),
 					0x70..0x77 => if op == 0x76 {
+						self.halted = true;
 						self.regs.pc.v -= 1; // Just wait here ok?
+						//if !self.interrupts_enabled || self.mem.readbyte(0xFFFF) == 0 {
+						//	fail!("Halt with interrupts disabled, I don't know what to do.");
+						//}
+						//println!("ie {:X}", self.mem.readbyte(0xFFFF));
+						//println!("tc {:X}", self.mem.readbyte(0xFF07));
 					} else {
 						self.mem.writebyte(self.regs.hl.v, b)
 					},
@@ -802,11 +818,19 @@ impl Cpu {
 		}
 
 		self.regs.pc.v += 1;
-		self.run_clock();
+		self.last_op = op;
 	}
 	pub fn interrupts(&mut self) {
+		self.mem.ime_delay = match self.mem.ime_delay {
+			0 => 0,
+			1 => {
+				self.interrupts_enabled = true;
+				0
+			},
+			2 => 1,
+			_ => fail!("Unexpected IME delay")};
 		for n in range(0, 4) {
-			if !self.interrupts_enabled {
+			if !self.interrupts_enabled && !self.halted {
 				return;
 			}
 			let a = match n {
@@ -822,8 +846,14 @@ impl Cpu {
 			if (f & e) >> n & 1 != 1 {
 				continue;
 			}
-			self.mem.writebyte(0xFF0F, f ^ 1 << n);
-			self.call(a+1);
+			//println!("Calling int {:X}h", a);
+			if !self.halted {
+				self.mem.writebyte(0xFF0F, f ^ 1 << n);
+				self.call_interrupt(a);
+			} else {
+				self.halted = false;
+				self.regs.pc.v += 1;
+			}
 			break;
 		}
 	}
