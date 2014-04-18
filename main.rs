@@ -67,12 +67,14 @@ fn test_instr() {
 	let lines: ~[~str] = f.lines().map(|x| x.unwrap()).collect();
 
 	let mut rom = ~[0 as u8, ..0x200];
-	rom[0x100] = 0x3D;
+	rom[0x100] = 0x27;
 	let mut cpu = Cpu::new(rom);
 	for i_ in range(0, 0xFFFF) {
 		let i = i_ as u16;
-		cpu.regs.af.v = (i << 8 | 1 << 4);
-		cpu.regs.bc.v = (i & 0xFF00);
+		cpu.regs.af.v = i & 0xFFF0;
+		cpu.regs.bc.v = 0;
+		//cpu.regs.af.v = (i << 8 | 1 << 4);
+		//cpu.regs.bc.v = (i & 0xFF00);
 		println!("input: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
 		cpu.next();
 		let line = lines[i as uint].clone();

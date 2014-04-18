@@ -284,6 +284,9 @@ impl Cpu {
 		};
 		self.regs.af.set_low(n);
 	}
+	fn check_addsub_flag(&mut self) -> bool {
+		self.regs.af.get_low() & (1 << 6) != 0
+	}
 	fn set_hc_flag(&mut self, v : bool) {
 		let n = if v {
 			self.regs.af.get_low() | (1 << 5)
@@ -291,6 +294,9 @@ impl Cpu {
 			self.regs.af.get_low() & !(1 << 5)
 		};
 		self.regs.af.set_low(n);
+	}
+	fn check_hc_flag(&mut self) -> bool {
+		self.regs.af.get_low() & (1 << 5) != 0
 	}
 	fn and(&mut self, v : u8) {
 		let a = self.regs.af.get_high() & v;
@@ -460,6 +466,29 @@ impl Cpu {
 			0x24 => {let a = self.regs.hl.inc_high(); self.incflags(a)},
 			0x25 => {let a = self.regs.hl.dec_high(); self.decflags(a)},
 			0x26 => {self.regs.hl.set_high(n); self.regs.pc.v += 1},
+			0x27 => { //DAA
+				let mut a = self.regs.af.get_high();
+				if !self.check_addsub_flag() {
+					if a > 0x99 || self.check_carry_flag() {
+						a += 0x60;
+						self.set_carry_flag(true);
+					}
+					if a & 0xF > 0x9 || self.check_hc_flag() {
+						a += 0x6;
+						self.set_hc_flag(false);
+					}
+				} else if self.check_carry_flag() && self.check_hc_flag() {
+					a += 0x9A;
+					self.set_hc_flag(false);
+				} else if self.check_carry_flag() {
+					a += 0xA0;
+				} else if self.check_hc_flag() {
+					a += 0xFA;
+					self.set_hc_flag(false);
+				}
+				self.regs.af.set_high(a);
+				self.set_zero_flag(a == 0);
+			}
 			0x28 => if self.check_zero_flag() {self.jr(n)} else {self.regs.pc.v += 1},
 			0x29 => {let r = self.regs.hl.add(self.regs.hl.v); self.addflags16(r)},
 			0x2A => {
