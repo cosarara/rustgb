@@ -4,8 +4,11 @@ use sdl::video::Surface;
 use sdl::video::Color;
 use sdl::video::RGB;
 use std::io::File;
+use std::io::{File, Open, ReadWrite};
 use cpu::Cpu;
 use std::io::println;
+use std::num;
+use std::io::BufferedReader;
 mod cpu;
 mod mem;
 
@@ -56,6 +59,37 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 	}
 	screen.blit_at(t1, 0, 260);
 	putpixel(screen, 5, 5, RGB(0xFF, 0, 0));
+}
+
+#[test]
+fn test_instr() {
+	let mut f = BufferedReader::new(File::open(&Path::new("out")));
+	let lines: ~[~str] = f.lines().map(|x| x.unwrap()).collect();
+
+	let mut rom = ~[0 as u8, ..0x200];
+	rom[0x100] = 0x3D;
+	let mut cpu = Cpu::new(rom);
+	for i_ in range(0, 0xFFFF) {
+		let i = i_ as u16;
+		cpu.regs.af.v = (i << 8 | 1 << 4);
+		cpu.regs.bc.v = (i & 0xFF00);
+		println!("input: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
+		cpu.next();
+		let line = lines[i as uint].clone();
+		let mut it = line.split_str(",");
+		let afs = it.next().unwrap();
+		let bcs_t = it.next().unwrap();
+		let bcs = bcs_t.slice_to(bcs_t.len()-1);
+		let afo : Option<u16> = num::from_str_radix(afs, 16);
+		let af = afo.unwrap();
+		let bco : Option<u16> = num::from_str_radix(bcs, 16);
+		let bc = bco.unwrap();
+		println!("output js: {:04X}, {:04X}", af, bc);
+		println!("output rust: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
+		assert!(cpu.regs.af.v == af);
+		assert!(cpu.regs.bc.v == bc);
+		cpu.regs.pc.v = 0x100;
+	}
 }
 
 fn main() {

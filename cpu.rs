@@ -7,7 +7,7 @@ use std::io::println;
 //use std::os::args;
 use mem::Mem;
 struct Reg {
-	v : u16
+	pub v : u16
 }
 
 fn sign(v : u8) -> i8 {
@@ -81,12 +81,12 @@ impl Reg {
 }
 
 struct Regs {
-	af : Reg,
-	bc : Reg,
-	de : Reg,
-	hl : Reg,
-	sp : Reg,
-	pc : Reg
+	pub af : Reg,
+	pub bc : Reg,
+	pub de : Reg,
+	pub hl : Reg,
+	pub sp : Reg,
+	pub pc : Reg
 }
 
 impl Regs {
@@ -103,7 +103,7 @@ impl Regs {
 }
 
 pub struct Cpu {
-	regs : Regs,
+	pub regs : Regs,
 	pub mem : Mem,
 	clock : uint,
 	screen_mode : int,
@@ -147,54 +147,94 @@ impl Cpu {
 		self.set_zero_flag(val == 0);
 	}
 
-	fn z16(&mut self, val : u16) {
-		self.set_zero_flag(val == 0);
-	}
-
-	fn incflags(&mut self, t : (u8, u8)) {
-		let r = self.ca8(t);
+	fn incflags(&mut self, (a, r) : (u8, u8)) {
 		self.z8(r);
 		self.set_addsub_flag(false);
-		let (a, _) = t;
-		self.set_hc_flag((a&0xF) == 0);
-	}
-
-	fn incflags16(&mut self, t : (u16, u16)) {
-		//let r = self.ca16(t);
-		//self.z16(r);
-		//self.set_addsub_flag(false);
+		self.set_hc_flag((r&0xF) == 0);
 	}
 
 	fn addflags(&mut self, t : (u8, u8)) {
-		self.incflags(t);
-		self.set_addsub_flag(false);
 		let (a, f) = t;
+		self.ca8(t);
+		self.incflags(t);
 		self.set_hc_flag(((f&0xF) < (a&0xF)));
 	}
 
 	fn addflags16(&mut self, t : (u16, u16)) {
 		let r = self.ca16(t);
-		//self.incflags16(t);
-		self.set_addsub_flag(false); // Yes, really
+		self.set_addsub_flag(false);
 		let (a, f) = t;
 		self.set_hc_flag(((f&0xFFF) < (a&0xFFF)));
 	}
 
-	fn decflags(&mut self, t : (u8, u8)) {
-		let r = self.cs8(t);
+	fn decflags(&mut self, (a, r) : (u8, u8)) {
 		self.z8(r);
-		self.set_addsub_flag(false);
-		let (a, _) = t;
-		self.set_hc_flag((a&0xF) == 0xF);
+		self.set_addsub_flag(true);
+		self.set_hc_flag((r&0xF) == 0xF);
 	}
 
 	fn subflags(&mut self, t : (u8, u8)) {
+		self.cs8(t);
 		self.decflags(t);
-		self.set_addsub_flag(true);
 		let (a, f) = t;
 		self.set_hc_flag(((a&0xF) < (f&0xF)));
 	}
 
+	fn adc(&mut self, b : u8) {
+		let c = self.check_carry_flag() as u8;
+		let a = self.regs.af.get_high();
+		let f = self.regs.af.add_high(b+c);
+		self.addflags(f);
+		let adc : uint = a as uint + b as uint + c as uint;
+		self.set_carry_flag(adc > 0xFF);
+		let h = (a & 0xF) + (b & 0xF) + c > 0xF;
+		self.set_hc_flag(h);
+	}
+
+	fn sbc(&mut self, b : u8) {
+		let c = self.check_carry_flag();
+		let a = self.regs.af.get_high();
+		let f = self.regs.af.sub_high(b+c as u8);
+		self.subflags(f);
+		let h : bool = ((a & 0xF) as int - (b & 0xF) as int - c as int) < 0 as int;
+		let sbc : int = a as int - b as int - c as int;
+		self.set_carry_flag(sbc < 0);
+		self.set_hc_flag(h);
+	}
+	fn rlc(&mut self, x : u8) -> u8 {
+		let a = (x << 1) | (x >> 7);
+		self.set_carry_flag(a & 1 == 1);
+		self.set_zero_flag(a == 0);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
+		a
+	}
+	fn rrc(&mut self, x : u8) -> u8 {
+		let a = (x >> 1) | (x << 7);
+		self.set_carry_flag(a >> 7 == 1);
+		self.set_zero_flag(a == 0);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
+		a
+	}
+	fn rl(&mut self, x : u8) -> u8 {
+		let b = x >> 7;
+		let r = x << 1 | (if self.check_carry_flag() {1} else {0});
+		self.set_carry_flag(b == 1);
+		self.set_zero_flag(r == 0);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
+		r
+	}
+	fn rr(&mut self, x : u8) -> u8 {
+		let b = x & 1;
+		let r = x >> 1 | (if self.check_carry_flag() {1} else {0}) << 7;
+		self.set_carry_flag(b == 1);
+		self.set_zero_flag(r == 0);
+		self.set_addsub_flag(false);
+		self.set_hc_flag(false);
+		r
+	}
 	fn push(&mut self, v : u16) {
 		self.regs.sp.v -= 2;
 		let m : ~[u8] = ~[(v & 0xFF) as u8, (v >> 8) as u8];
@@ -365,15 +405,12 @@ impl Cpu {
 			0x06 => {self.regs.bc.set_high(n); self.regs.pc.v += 1},
 			0x07 => {
 				let a = self.regs.af.get_high();
-				let b = (a << 1) | (a >> 7);
-				self.set_carry_flag(b & 1 == 1);
-				self.regs.af.set_high(b)
+				let b = self.rlc(a);
+				self.regs.af.set_high(b);
+				self.set_zero_flag(false);
 			},
 			0x08 => {
 				self.mem.write(nn, self.regs.sp.to_bytes());
-				//let a = self.mem.readbyte(nn);
-				//let b = self.mem.readbyte(nn+1);
-				//fail!("08: {:X} {:X} {:X}", a, b, self.regs.sp.v);
 				self.regs.pc.v += 2},
 			0x09 => {let r = self.regs.hl.add(self.regs.bc.v); self.addflags16(r)},
 			0x0A => {self.regs.af.set_high(self.mem.readbyte(self.regs.bc.v))},
@@ -383,9 +420,9 @@ impl Cpu {
 			0x0E => {self.regs.bc.set_low(n); self.regs.pc.v += 1},
 			0x0F => {
 				let a = self.regs.af.get_high();
-				let b = (a >> 1) | (a << 7);
-				self.set_carry_flag(b >> 7 == 1);
-				self.regs.af.set_high(b)
+				let b = self.rrc(a);
+				self.regs.af.set_high(b);
+				self.set_zero_flag(false);
 			},
 			0x10 => {fail!("STOP")},
 			0x11 => {self.regs.de.v = nn; self.regs.pc.v += 2},
@@ -396,7 +433,9 @@ impl Cpu {
 			0x16 => {self.regs.de.set_high(n); self.regs.pc.v += 1},
 			0x17 => {
 				let a = self.regs.af.get_high();
-				self.regs.af.set_high((a << 1) | (a >> 7))
+				let b = self.rl(a);
+				self.regs.af.set_high(b);
+				self.set_zero_flag(false);
 			},
 			0x18 => self.jr(n),
 			0x19 => {let r = self.regs.hl.add(self.regs.de.v); self.addflags16(r)},
@@ -406,11 +445,10 @@ impl Cpu {
 			0x1D => {let a = self.regs.de.dec_low(); self.decflags(a)},
 			0x1E => {self.regs.de.set_low(n); self.regs.pc.v += 1},
 			0x1F => {
-				let x = self.regs.af.get_high();
-				let b = x & 1;
-				let r = x >> 1 | (if self.check_carry_flag() {1} else {0}) << 7;
-				self.set_carry_flag(b == 1);
-				self.regs.af.set_high(r);
+				let a = self.regs.af.get_high();
+				let b = self.rr(a);
+				self.regs.af.set_high(b);
+				self.set_zero_flag(false);
 			},
 			0x20 => if !self.check_zero_flag() {self.jr(n)} else {self.regs.pc.v += 1},
 			0x21 => {self.regs.pc.v += 2; self.regs.hl.v = nn},
@@ -504,19 +542,11 @@ impl Cpu {
 					0x80..0x87 => {
 						let f = self.regs.af.add_high(b);
 						self.addflags(f)},
-					0x88..0x8F => { //ADC
-						let c = self.check_carry_flag() as u8;
-						let a = self.regs.af.get_high();
-						let f = self.regs.af.add_high(b+c);
-						self.addflags(f);
-						self.set_hc_flag(a & 0xF + b & 0xF + c > 0xF);},
+					0x88..0x8F => self.adc(b), //ADC
 					0x90..0x97 => {
 						let f = self.regs.af.sub_high(b);
 						self.subflags(f)},
-					0x98..0x9F => { //SBC
-						let c = self.check_carry_flag();
-						let f = self.regs.af.sub_high(b-c as u8);
-						self.subflags(f)},
+					0x98..0x9F => self.sbc(b), //SBC
 					0xA0..0xA7 => {self.and(b)}
 					0xA8..0xAF => {self.xor(b)}
 					0xB0..0xB7 => {self.or(b)}
@@ -542,58 +572,41 @@ impl Cpu {
 			0xCB => {
 				fn f(s : &mut Cpu, n: u8, x: u8) -> u8 {
 					if n < 0x8 { // RLC
-						let a = (x << 1) | (x >> 7);
-						s.set_carry_flag(a & 1 == 1);
-						s.set_zero_flag(a == 0);
-						s.set_addsub_flag(false);
-						s.set_hc_flag(false);
-						a
+						s.rlc(x)
 					} else if n < 0x10 { // RRC
-						let a = (x >> 1) | (x << 7);
-						s.set_carry_flag(a >> 7 == 1);
-						s.set_zero_flag(a == 0);
-						s.set_addsub_flag(false);
-						s.set_hc_flag(false);
-						a
+						s.rrc(x)
 					} else if n < 0x18 { // RL
-						//(x << 1) | (x >> 7)
-						let b = x >> 7;
-						let r = x << 1 | (if s.check_carry_flag() {1} else {0});
-						s.set_carry_flag(b == 1);
-						s.set_zero_flag(r == 0);
-						s.set_addsub_flag(false);
-						s.set_hc_flag(false);
-						r
+						s.rl(x)
 					} else if n < 0x20 { // RR
-						let b = x & 1;
-						let r = x >> 1 | (if s.check_carry_flag() {1} else {0}) << 7;
-						s.set_carry_flag(b == 1);
-						s.set_zero_flag(r == 0);
-						s.set_addsub_flag(false);
-						s.set_hc_flag(false);
-						r
+						s.rr(x)
 					} else if n < 0x28 { // SLA
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
+						s.set_carry_flag(x >> 7 == 1);
 						let r = x << 1;
-						s.set_carry_flag(r >> 7 == 1);
 						s.set_zero_flag(r == 0);
 						r
 					} else if n < 0x30 { // SRA
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
-						let r = x >> 1;
-						s.set_carry_flag(r & 1 == 1);
+						s.set_carry_flag(x & 1 == 1);
+						let r = (x & 0x80) | (x >> 1);
 						s.set_zero_flag(r == 0);
 						r
 					} else if n < 0x38 { // SWAP
+						s.set_carry_flag(false);
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
-						x << 4 | x >> 4
+						let r = x << 4 | x >> 4;
+						s.set_zero_flag(r == 0);
+						r
 					} else if n < 0x40 { // SRL
+						s.set_carry_flag(x & 1 == 1);
 						s.set_addsub_flag(false);
 						s.set_hc_flag(false);
-						x >> 1
+						let r = x >> 1;
+						s.set_zero_flag(r == 0);
+						r
 					} else if n < 0x80 { // BIT
 						let b = n >> 3 & 7;
 						let c = (x >> b) & 1;
@@ -628,11 +641,7 @@ impl Cpu {
 			0xCC => {self.regs.pc.v += 2; if self.check_zero_flag() {self.call(nn)}},
 			0xCD => {self.regs.pc.v += 2; self.call(nn)},
 			0xCE => {
-				let c = self.check_carry_flag() as u8;
-				let a = self.regs.af.get_high();
-				let f = self.regs.af.add_high(n+c);
-				self.addflags(f);
-				self.set_hc_flag(a & 0xF + n & 0xF + c > 0xF);
+				self.adc(n);
 				self.regs.pc.v += 1},
 			0xCF => self.call(0x08),
 			0xD0 => {if !self.check_carry_flag() {self.ret()}},
@@ -654,9 +663,7 @@ impl Cpu {
 			// DD does not exist
 			0xDE => {
 				self.regs.pc.v += 1;
-				let c = self.check_carry_flag();
-				let f = self.regs.af.sub_high(n-c as u8);
-				self.subflags(f)},
+				self.sbc(n)},
 			0xDF => self.call(0x18),
 			0xE0 => {
 				let addr : u16 = 0xFF00 + n as u16;
