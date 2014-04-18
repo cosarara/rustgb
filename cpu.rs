@@ -671,10 +671,10 @@ impl Cpu {
 						s.set_hc_flag(true);
 						x
 					} else if n < 0xC0 { // RES
-						let b = (n >> 3) & 0xF;
+						let b = (n >> 3) & 0x7;
 						x & (0xFF ^ (1 << b))
 					} else { // SET
-						let b = (n >> 3) & 0xF;
+						let b = (n >> 3) & 0x7;
 						x | (1 << b)
 					}
 				}
