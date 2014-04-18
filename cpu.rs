@@ -164,7 +164,7 @@ impl Cpu {
 		let r = self.ca16(t);
 		self.set_addsub_flag(false);
 		let (a, f) = t;
-		self.set_hc_flag(((f&0xFFF) < (a&0xFFF)));
+		self.set_hc_flag((f&0xFFF) < (a&0xFFF));
 	}
 
 	fn decflags(&mut self, (a, r) : (u8, u8)) {
@@ -709,9 +709,18 @@ impl Cpu {
 			0xE6 => {self.and(n); self.regs.pc.v += 1},
 			0xE7 => self.call(0x20),
 			0xE8 => {
-				let r = self.regs.sp.addi8(sign(n));
-				self.addflags16(r);
+				let sp1 = self.regs.sp.v;
+				let sn = sign(n);
+				self.regs.sp.addi8(sn);
+				//self.addflags16(r);
+				let sp2 = self.regs.sp.v;
+				// I have no idea of what I'm doing here,
+				// looked it up from Gameboy-Online source
+				let f = sp1 as i16^sn as i16^sp2 as i16;
+				self.set_hc_flag(f&0x10 == 0x10);
+				self.set_carry_flag(f&0x100 == 0x100);
 				self.set_zero_flag(false);
+				self.set_addsub_flag(false);
 				self.regs.pc.v += 1;},
 			0xE9 => { // Docs says its a jump to (hl), but seems it's jp hl
 				self.regs.pc.v = self.regs.hl.v-1},
@@ -741,10 +750,16 @@ impl Cpu {
 			0xF6 => {self.or(n); self.regs.pc.v += 1},
 			0xF7 => self.call(0x30),
 			0xF8 => {
-				let o = self.regs.sp.v;
-				let r = (o as i16 + sign(n) as i16) as u16;
-				self.addflags16((o, r));
+				let sp = self.regs.sp.v;
+				let hl1 = self.regs.hl.v;
+				let sn = sign(n);
+				let r = (sp as i16 + sn as i16) as u16;
+				// Also don't really know what I'm doing here
+				let f = sp as i16^sn as i16^r as i16;
 				self.set_zero_flag(false);
+				self.set_addsub_flag(false);
+				self.set_hc_flag(f&0x10 == 0x10);
+				self.set_carry_flag(f&0x100 == 0x100);
 				self.regs.hl.v = r;
 				self.regs.pc.v += 1;},
 			0xF9 => {self.regs.sp.v = self.regs.hl.v},
