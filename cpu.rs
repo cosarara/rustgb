@@ -344,7 +344,7 @@ impl Cpu {
 					if self.mem.mem[0xff44] == 143 {
 						self.drawing = true;
 						self.screen_mode = 1; // Finish, go to VBlank
-						self.request_interrupt(0);
+						self.mem.request_interrupt(0);
 					} else {
 						self.screen_mode = 2;
 					}
@@ -376,6 +376,33 @@ impl Cpu {
 				}
 			},
 			_ => fail!("Wat"),
+		}
+		let tcontrol = self.mem.readbyte(0xFF07);
+		//println!("clock ctrl : {:X}", tcontrol);
+		let tspeed = tcontrol & 3;
+		let tclock = self.clock / 4;
+		if tcontrol & 4 != 0 {
+			//println("clocking");
+			if tclock % 16 == 0 {
+				let div = self.mem.readbyte(0xFF04);
+				self.mem.writebyte(0xFF04, div + 1);
+			}
+			let a = match tspeed {
+				0 => 64,
+				1 => 1,
+				2 => 4,
+				3 => 16,
+				_ => fail!("Do you even binary?")
+			};
+			let mut count = self.mem.readbyte(0xFF05);
+			if tclock % a == 0 {
+				count += 1;
+				if count == 0 {
+					self.mem.request_interrupt(2);
+					count = self.mem.readbyte(0xFF06);
+				}
+				self.mem.writebyte(0xFF05, count);
+			}
 		}
 	}
 	pub fn next(&mut self) {
@@ -642,7 +669,7 @@ impl Cpu {
 						s.set_zero_flag(c != 1);
 						s.set_addsub_flag(false);
 						s.set_hc_flag(true);
-						c
+						x
 					} else if n < 0xC0 { // RES
 						let b = (n >> 3) & 0xF;
 						x & (0xFF ^ (1 << b))
@@ -776,10 +803,6 @@ impl Cpu {
 
 		self.regs.pc.v += 1;
 		self.run_clock();
-	}
-	pub fn request_interrupt(&mut self, n : u8) {
-		let f = self.mem.readbyte(0xFF0F);
-		self.mem.writebyte(0xFF0F, f | 1 << n);
 	}
 	pub fn interrupts(&mut self) {
 		for n in range(0, 4) {

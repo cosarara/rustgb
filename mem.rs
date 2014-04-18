@@ -58,7 +58,7 @@ impl Mem {
 			ka : false,
 			kb : false,
 			kselect : false,
-			kstart : false
+			kstart : false,
 		}
 	}
 	pub fn rom_bank(&self) -> u16 {
@@ -120,7 +120,6 @@ impl Mem {
 				!self.kdown as u8 << 3 |
 				0x20
 			};
-			//println!("eeeeee {:X}", a);
 			a | 0xC0
 		} else {
 			self.mem[offset as uint]
@@ -168,7 +167,6 @@ impl Mem {
 				println!("WARNING: wrote at {:x}", offset);
 			}
 		} else if offset == 0xFF00 {
-			//println!("lalala {:X}", value);
 			if value >> 4 & 1 == 0 {
 				self.buttons = false
 			} else if value >> 5 & 1 == 0 {
@@ -183,6 +181,7 @@ impl Mem {
 				};
 				let mut stde = stderr();
 				stde.write_str(cs);
+				self.request_interrupt(2);
 			}
 		} else {
 			self.mem[offset as uint] = value;
@@ -212,5 +211,9 @@ impl Mem {
 		self.writebyte(offset+1 as u16, (value >> 8) as u8);
 	}
 	*/
+	pub fn request_interrupt(&mut self, n : u8) {
+		let f = self.readbyte(0xFF0F);
+		self.writebyte(0xFF0F, f | 1 << n);
+	}
 }
 
