@@ -425,7 +425,8 @@ impl Cpu {
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
 		if std::os::args().len() > 2 && !(op == 0x76 && self.last_op == 0x76) {
-			//println("");
+			//println!("PC: {:04X} | OPCODE: {:02X} | MEM: {:04X}",
+			//	self.regs.pc.v, op, nn);
 			println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
 					 self.regs.af.v, self.regs.bc.v, self.regs.de.v, self.regs.hl.v,
@@ -694,19 +695,42 @@ impl Cpu {
 						x | (1 << b)
 					}
 				}
-				match n & 7 {
-					0 => {let x = self.regs.bc.get_high(); let r = f(self, n, x); self.regs.bc.set_high(r)},
-					1 => {let x = self.regs.bc.get_low(); let r = f(self, n, x); self.regs.bc.set_low(r)},
-					2 => {let x = self.regs.de.get_high(); let r = f(self, n, x); self.regs.de.set_high(r)},
-					3 => {let x = self.regs.de.get_low(); let r = f(self, n, x); self.regs.de.set_low(r)},
-					4 => {let x = self.regs.hl.get_high(); let r = f(self, n, x); self.regs.hl.set_high(r)},
-					5 => {let x = self.regs.hl.get_low(); let r = f(self, n, x); self.regs.hl.set_low(r)},
-					6 => {let a = self.regs.hl.v;
+				if n < 0x40 || n > 0x80 {
+					match n & 7 {
+						0 => {let x = self.regs.bc.get_high();
+							let r = f(self, n, x); self.regs.bc.set_high(r)},
+						1 => {let x = self.regs.bc.get_low();
+							let r = f(self, n, x); self.regs.bc.set_low(r)},
+						2 => {let x = self.regs.de.get_high(); 
+							let r = f(self, n, x); self.regs.de.set_high(r)},
+						3 => {let x = self.regs.de.get_low(); 
+							let r = f(self, n, x); self.regs.de.set_low(r)},
+						4 => {let x = self.regs.hl.get_high(); 
+							let r = f(self, n, x); self.regs.hl.set_high(r)},
+						5 => {let x = self.regs.hl.get_low(); 
+							let r = f(self, n, x); self.regs.hl.set_low(r)},
+						6 => {let a = self.regs.hl.v;
 							let x = self.mem.readbyte(a);
 							let r = f(self, n, x);
 							self.mem.writebyte(a, r)},
-					7 => {let x = self.regs.af.get_high(); let r = f(self, n, x); self.regs.af.set_high(r)},
-					_ => fail!("wat.")
+						7 => {let x = self.regs.af.get_high();
+							let r = f(self, n, x); self.regs.af.set_high(r)},
+						_ => fail!("wat.")
+					}
+				} else {
+					match n & 7 {
+						0 => {let x = self.regs.bc.get_high(); f(self, n, x);},
+						1 => {let x = self.regs.bc.get_low(); f(self, n, x);},
+						2 => {let x = self.regs.de.get_high(); f(self, n, x);},
+						3 => {let x = self.regs.de.get_low(); f(self, n, x);},
+						4 => {let x = self.regs.hl.get_high(); f(self, n, x);},
+						5 => {let x = self.regs.hl.get_low(); f(self, n, x);},
+						6 => {let a = self.regs.hl.v;
+							let x = self.mem.readbyte(a);
+							f(self, n, x);},
+						7 => {let x = self.regs.af.get_high(); f(self, n, x);},
+						_ => fail!("wat.")
+					}
 				}
 				self.regs.pc.v += 1;
 			},

@@ -63,26 +63,26 @@ impl Mem {
 			ime_delay : 0,
 		}
 	}
-	pub fn rom_bank(&self) -> u16 {
+	pub fn rom_bank(&self) -> uint {
 		if self.mbc_type == 2 {
 			fail!("TODO");
 		} else if self.mbc_type == 1 {
 			let mut n = if self.mbc_romram {
-				self.mbc_rom_low | self.mbc_ram_n << 5
+				self.mbc_rom_low as uint | self.mbc_ram_n as uint << 5
 			} else {
-				self.mbc_rom_low
+				self.mbc_rom_low as uint
 			};
 			if n == 0 {
 				n = 1;
 			}
-			n as u16
+			n
 		} else if self.mbc_type == 3 {
-			self.mbc_rom_low as u16
+			self.mbc_rom_low as uint
 		} else if self.mbc_type == 5 {
 			if self.mbc_romram {
-				self.mbc_rom_low as u16 | 1 << 9
+				self.mbc_rom_low as uint | 1 << 9
 			} else {
-				self.mbc_rom_low as u16
+				self.mbc_rom_low as uint
 			}
 		} else {
 			fail!("lel");
@@ -104,7 +104,7 @@ impl Mem {
 			self.rom[offset as uint ]
 		} else if offset < 0x7FFF {
 			if self.mbc_type > 0 {
-				self.rom[(offset+0x4000*(self.rom_bank()-1)) as uint]
+				self.rom[offset as uint+0x4000*(self.rom_bank()-1)]
 			} else {
 				self.rom[offset as uint]
 			}
@@ -134,7 +134,7 @@ impl Mem {
 			if mtype == 1 || mtype == 5 {
 				self.mbc_ram_enable = value == 0xA;
 			}
-			println("WARNING: wrote at < 0x2000");
+			//println("WARNING: wrote at < 0x2000");
 		} else if offset < 0x4000 {
 			if mtype == 5 {
 				if offset < 0x3000 {
@@ -144,30 +144,31 @@ impl Mem {
 				}
 			} else if mtype == 1 {
 				self.mbc_rom_low = value & 0b11111;
-				println!("rom bank: {:X}", self.rom_bank());
+				//println!("bank low {:X}", self.mbc_rom_low);
+				//println!("rom bank: {:X}", self.rom_bank());
 			} else if mtype == 3 {
 				self.mbc_rom_low = value & 0b1111111;
-				println!("rom bank: {:X}", self.rom_bank());
+				//println!("rom bank: {:X}", self.rom_bank());
 			} else {
-				println!("WARNING: wrote at {:x}", offset);
+				//println!("WARNING: wrote at {:x}", offset);
 			}
 		} else if offset < 0x6000 {
 			if mtype == 1 {
 				self.mbc_ram_n = value & 0b11;
-				println!("rom bank: {:X}", self.rom_bank());
+				//println!("rom bank: {:X}", self.rom_bank());
 			} else if mtype == 3 {
 				self.mbc_romram = value != 0;
 			} else if mtype == 5 {
 				self.mbc_ram_n = value & 0xF;
 			} else {
-				println!("WARNING: wrote at {:x}", offset);
+				//println!("WARNING: wrote at {:x}", offset);
 			}
 		} else if offset < 0x7FFF {
 			if mtype != 2 && mtype != 0 {
 				self.mbc_romram = value & 1 == 1;
-				println!("rom bank: {:X}", self.rom_bank());
+				//println!("rom bank: {:X}", self.rom_bank());
 			} else {
-				println!("WARNING: wrote at {:x}", offset);
+				//println!("WARNING: wrote at {:x}", offset);
 			}
 		} else if offset == 0xFF00 {
 			if value >> 4 & 1 == 0 {

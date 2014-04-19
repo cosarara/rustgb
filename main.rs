@@ -123,8 +123,8 @@ fn main() {
 		cpu.run_clock();
 		let lcdc = cpu.mem.readbyte(0xFF40);
 		if cpu.drawing && lcdc >> 7 == 1 {
-			//draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
-			//screen.flip();
+			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
+			screen.flip();
 			cpu.drawing = false;
 		}
         'events : loop {
