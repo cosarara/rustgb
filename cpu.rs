@@ -425,12 +425,13 @@ impl Cpu {
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
 		if std::os::args().len() > 2 && !(op == 0x76 && self.last_op == 0x76) {
-			//println!("PC: {:04X} | OPCODE: {:02X} | MEM: {:04X}",
-			//	self.regs.pc.v, op, nn);
-			println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
+			println!("PC: {:04X} | OPCODE: {:02X} | MEM: {:02X}{:02X}",
+				self.regs.pc.v, op, n, nn>>8);
+			/*println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
 					 self.regs.pc.v, op, n, nn>>8, self.regs.sp.v,
 					 self.regs.af.v, self.regs.bc.v, self.regs.de.v, self.regs.hl.v,
 					 self.mem.read16(self.regs.sp.v));
+					 */
 			/*println!("-6 {:04X} -4 {:04X} -2 {:04X} +0 {:04X} +2 {:04X} +4 {:04X}",
 					 self.mem.read16(self.regs.hl.v-6),
 					 self.mem.read16(self.regs.hl.v-4),

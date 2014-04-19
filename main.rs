@@ -1,5 +1,6 @@
 
 extern crate sdl;
+extern crate libc;
 use sdl::video::Surface;
 use sdl::video::Color;
 use sdl::video::RGB;
@@ -9,8 +10,29 @@ use cpu::Cpu;
 use std::io::println;
 use std::num;
 use std::io::BufferedReader;
+use libc::{c_int, c_void, time_t};
+use std::ptr::null;
 mod cpu;
 mod mem;
+
+struct timeval {
+	tv_sec: time_t,
+	tv_usec: u32,
+}
+
+extern {
+	fn gettimeofday(tp: *mut timeval, tzp: *c_void) -> c_int;
+}
+
+pub fn current_time_millis() -> u64 {
+	unsafe {
+		let mut tv = timeval { tv_sec: 0, tv_usec: 0 };
+		gettimeofday(&mut tv, null());
+		(tv.tv_sec as u64) * 1000 + (tv.tv_usec as u64) / 1000
+	}
+}
+
+
 
 fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 	fn putpixel(screen : &Surface, x : i16, y : i16, color : Color) {
@@ -113,10 +135,11 @@ fn main() {
 		Some(g) => g,
 		None => fail!("Couldn't decode game title")
 	};
-	println(game_title);
+	//println(game_title);
 	let cart_type = rom_contents[0x147];
-	println!("cart type: {:X}", cart_type);
+	//println!("cart type: {:X}", cart_type);
 	let mut cpu = Cpu::new(rom_contents.to_owned());
+	let start_time = current_time_millis();
 	'main : loop {
 		cpu.next();
 		cpu.interrupts();
@@ -156,6 +179,7 @@ fn main() {
 			}
 		}
 	}
+	//println!("t: {}", (current_time_millis()-start_time)/1000);
     sdl::quit();
 }
 
