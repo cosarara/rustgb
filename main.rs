@@ -14,6 +14,7 @@ use libc::{c_int, c_void, time_t};
 use std::ptr::null;
 mod cpu;
 mod mem;
+mod events;
 
 struct timeval {
 	tv_sec: time_t,
@@ -140,6 +141,7 @@ fn main() {
 	//println!("cart type: {:X}", cart_type);
 	let mut cpu = Cpu::new(rom_contents.to_owned());
 	let start_time = current_time_millis();
+	let mut events_t = 0;
 	'main : loop {
 		cpu.next();
 		cpu.interrupts();
@@ -150,31 +152,16 @@ fn main() {
 			screen.flip();
 			cpu.drawing = false;
 		}
-        'events : loop {
-			match sdl::event::poll_event() {
-				sdl::event::NoEvent => break 'events,
-				sdl::event::QuitEvent => break 'main,
-				sdl::event::KeyEvent(k, p, _, _) => {
-					if k == sdl::event::EscapeKey {
-						break 'main
-					} else if k == sdl::event::ReturnKey {
-						cpu.mem.kstart = p
-					} else if k == sdl::event::BackspaceKey {
-						cpu.mem.kselect = p
-					} else if k == sdl::event::ZKey {
-						cpu.mem.ka = p
-					} else if k == sdl::event::XKey {
-						cpu.mem.kb = p
-					} else if k == sdl::event::UpKey {
-						cpu.mem.kup = p
-					} else if k == sdl::event::DownKey {
-						cpu.mem.kdown = p
-					} else if k == sdl::event::RightKey {
-						cpu.mem.kright = p
-					} else if k == sdl::event::LeftKey {
-						cpu.mem.kleft = p
-					}
-				},
+		if events_t < 10 {
+			events_t += 1;
+			continue;
+		}
+		events_t = 0;
+		'events : loop {
+			let e = events::events(&mut cpu);
+			match e { // Returns false on Quit event
+				1 => break 'events,
+				2 => break 'main,
 				_ => {}
 			}
 		}

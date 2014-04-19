@@ -111,6 +111,7 @@ pub struct Cpu {
 	interrupts_enabled : bool,
 	last_op : u8,
 	halted : bool,
+	log : bool,
 }
 
 impl Cpu {
@@ -124,6 +125,7 @@ impl Cpu {
 			interrupts_enabled : false,
 			last_op : 0,
 			halted : false,
+			log : std::os::args().len() > 2,
 		}
 	}
 	fn ei(&mut self) {
@@ -424,7 +426,7 @@ impl Cpu {
 		let op : u8 = self.mem.readbyte(self.regs.pc.v);
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
 		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
-		if std::os::args().len() > 2 && !(op == 0x76 && self.last_op == 0x76) {
+		if self.log && !(op == 0x76 && self.last_op == 0x76) {
 			println!("PC: {:04X} | OPCODE: {:02X} | MEM: {:02X}{:02X}",
 				self.regs.pc.v, op, n, nn>>8);
 			/*println!("{:04X} {:02X} {:02X} {:02X}\t\tSP: {:04X} AF: {:04X} BC: {:04X} DE: {:04X} HL: {:04X} On Stack: {:04X}",
