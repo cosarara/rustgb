@@ -45,6 +45,8 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
                 h: 1
 		}), color);
 	}
+	screen.fill_rect(Some(sdl::Rect {x: 0, y: 0, w: 160, h: 140}),
+		RGB(0xFF, 0xFF, 0xFF));
 	let t1 = match Surface::new(&[], 512, 512, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000) {
         Ok(s) => s,
         Err(err) => fail!("failed to set video mode: {}", err)
@@ -152,6 +154,7 @@ fn main() {
 			time += 1;
 		} else {
 			let new_time = current_time_millis();
+			// This should print something close to 1000
 			//println!("t: {}", new_time-start_time);
 			start_time = new_time;
 			time = 0;
