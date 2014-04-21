@@ -85,7 +85,6 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 		}
 	}
 	screen.blit_at(t1, 0, 260);
-	putpixel(screen, 5, 5, RGB(0xFF, 0, 0));
 }
 
 #[test]
