@@ -73,7 +73,11 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 	for row in range(0, 32) {
 		for cell_n in range(0, 32) {
 			let addr = (base_bgmap_addr+row*32+cell_n) as uint;
-			let tile_n = vram[addr] as i16;
+			let mut tile_n = vram[addr] as i16;
+			if lcdc >> 4 & 1 == 0 {
+				tile_n = cpu::sign(tile_n as u8) as i16;
+				tile_n += 128;
+			}
 			let sx = tile_n%(cols as i16)*8;
 			let sy = tile_n/(cols as i16)*8;
 			screen.blit_rect(t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),

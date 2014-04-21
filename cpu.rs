@@ -10,7 +10,7 @@ struct Reg {
 	pub v : u16
 }
 
-fn sign(v : u8) -> i8 {
+pub fn sign(v : u8) -> i8 {
 	// Dunno how to cast to signed :S
 	if (v & 0x80) == 0x80 {
 		-((!v)+1) as i8
