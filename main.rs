@@ -143,19 +143,34 @@ fn main() {
 	let cart_type = rom_contents[0x147];
 	//println!("cart type: {:X}", cart_type);
 	let mut cpu = Cpu::new(rom_contents.to_owned());
-	let start_time = current_time_millis();
+	let mut start_time = current_time_millis();
 	let mut events_t = 0;
+	let mut draw_t = 0;
+	let mut time = 0;
 	'main : loop {
+		if time < 1000000 {
+			time += 1;
+		} else {
+			let new_time = current_time_millis();
+			//println!("t: {}", new_time-start_time);
+			start_time = new_time;
+			time = 0;
+		}
 		cpu.next();
 		cpu.interrupts();
 		cpu.run_clock();
 		let lcdc = cpu.mem.readbyte(0xFF40);
 		if cpu.drawing && lcdc >> 7 == 1 {
-			draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
-			screen.flip();
 			cpu.drawing = false;
+			if draw_t < 10 {
+				draw_t += 1;
+			} else {
+				draw_t = 0;
+				draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
+				screen.flip();
+			}
 		}
-		if events_t < 10 {
+		if events_t < 1000 {
 			events_t += 1;
 			continue;
 		}
