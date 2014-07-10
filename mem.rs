@@ -127,6 +127,9 @@ impl<'rom> Mem<'rom> {
 			self.mem[offset as uint]
 		}
 	}
+    pub fn force_writebyte(&mut self, offset : u16, value : u8) {
+        self.mem[offset as uint] = value;
+    }
 	pub fn writebyte(&mut self, offset : u16, value : u8) {
 		//println!("Written {:X} to {:X}", value, offset);
 		let mtype = self.mbc_type;
@@ -190,6 +193,14 @@ impl<'rom> Mem<'rom> {
 				};
 				self.request_interrupt(3);
 			}
+        } else if offset == 0xFF04 {
+            self.mem[0xFF04] = 0;
+        } else if offset == 0xFF46 { // OAM DMA Transfer
+            for i in range(0u, 100) {
+                let s = value as uint << 8 | i;
+                let d = 0xFE00 | i;
+                self.mem[d] = self.mem[s];
+            }
 		} else {
 			self.mem[offset as uint] = value;
 		}

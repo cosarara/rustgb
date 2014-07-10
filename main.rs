@@ -22,21 +22,43 @@ pub fn current_time_millis() -> u64 {
 	(tm.tm_sec as u64) * 1000 + (tm.tm_nsec as u64) / 1000
 }
 
+fn putpixel(screen : &Surface, x : uint, y : uint, color : u32) {
+    screen.lock();
+    unsafe {
+        let pitch = (*screen.raw).pitch as uint;
+        let h = (*screen.raw).h as uint;
+        let p = y * (pitch / std::mem::size_of_val(&(0 as u32))) + x;
+        let pixels: &mut [u32] = std::mem::transmute(((*screen.raw).pixels, (h*pitch) as uint));
+        pixels[p] = color as u32;
+    }
+    screen.unlock();
+}
 
+fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface) {
+	let cols = 16u;
+    for i in range(0u, 40) {
+        let base = i * 4;
+        let y = oam[base] - 16;
+        let x = oam[base+1] - 8;
+        //println!("x, y : {}, {}, {}", x, y, oam[0]);
+        let tile_n = oam[base+2] as i16;
+        let attrs = oam[base+3];
+        let priority = attrs >> 7 & 1;
+        let yflip = attrs >> 6 & 1;
+        let xflip = attrs >> 5 & 1;
+        let palnum = attrs >> 4 & 1;
 
-fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
-	fn putpixel(screen : &Surface, x : i16, y : i16, color : Color) {
-		// Stupid implementation, but I don't want to fight C and unsafety now
-		screen.fill_rect(Some(sdl::Rect {
-                x: x,
-                y: y,
-                w: 1,
-                h: 1
-		}), color);
-	}
+        let sx = tile_n%(cols as i16)*8;
+        let sy = tile_n/(cols as i16)*8;
+        screen.blit_rect(t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+            Some(sdl::Rect {x:x as i16, y:y as i16, w:8, h:8}));
+    }
+}
+
+fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
 	screen.fill_rect(Some(sdl::Rect {x: 0, y: 0, w: 160, h: 140}),
 		RGB(0xFF, 0xFF, 0xFF));
-	let t1 = match Surface::new(&[], 512, 512, 32, 0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000) {
+	let t1 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
         Ok(s) => s,
         Err(err) => fail!("failed to set video mode: {}", err)
 	};
@@ -49,12 +71,11 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 			for pixel in range(0, 8) {
 				let c = vram[laddr] >> 7 - pixel & 1 |
 						(vram[laddr+1] >> 7 - pixel & 1) << 1;
-				//println!("qwer {:X} {} {}", laddr, vram[laddr], vram[laddr+1]);
-				putpixel(&t1, (tile%cols*8+pixel) as i16, (tile/cols*8+line) as i16, match c {
-					3 => RGB(0, 0, 0),
-					2 => RGB(0x55, 0x55, 0x55),
-					1 => RGB(0xAA, 0xAA, 0xAA),
-					0 => RGB(0xFF, 0xFF, 0xFF),
+				putpixel(&t1, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
+					3 => 0 as u32,
+					2 => 0x555555 as u32,
+					1 => 0xAAAAAA as u32,
+					0 => 0xFFFFFF as u32,
 					_ => fail!("you are terminated")
 				});
 			}
@@ -75,6 +96,7 @@ fn draw(screen : &Surface, vram : &[u8], lcdc : u8) {
 				Some(sdl::Rect {x:(cell_n*8) as i16, y:(row*8) as i16, w:8, h:8}));
 		}
 	}
+    draw_sprites(screen, vram, oam, &t1);
 	screen.blit_at(&t1, 0, 260);
 }
 
@@ -168,7 +190,7 @@ fn main() {
 				draw_t += 1;
 			} else {
 				draw_t = 0;
-				draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), lcdc);
+				draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), cpu.mem.mem.slice(0xFE00, 0xFEA0), lcdc);
 				screen.flip();
 			}
 		}
