@@ -1,16 +1,15 @@
 
-use std::io::println;
 use std::str::from_utf8;
 use std::io::stderr;
 
-pub struct Mem {
+pub struct Mem<'rom> {
 	pub mbc_type : u8,
 	pub mbc_rom_low : u8,
 	pub mbc_ram_n : u8,
 	pub mbc_romram : bool,
 	pub mbc_ram_enable : bool,
 	pub mem : [u8, ..0x10000],
-	pub rom : ~[u8],
+	pub rom : &'rom [u8],
 	buttons : bool,
 	pub kup : bool,
 	pub kdown : bool,
@@ -23,8 +22,8 @@ pub struct Mem {
 	pub ime_delay : u8,
 }
 
-impl Mem {
-	pub fn new(rom : ~[u8]) -> Mem {
+impl<'rom> Mem<'rom> {
+	pub fn new<'a>(rom : &'a [u8]) -> Mem<'a> {
 		let mut mem = [0, ..0x10000];
 		mem[0xFF40] = 0x91;
 		mem[0xFF47] = 0xFC;
@@ -88,6 +87,7 @@ impl Mem {
 			fail!("lel");
 		}
 	}
+	#[allow(dead_code)]
 	pub fn ram_bank(&self) -> u8 {
 		if self.mbc_type == 1 {
 			if self.mbc_romram {
@@ -96,7 +96,7 @@ impl Mem {
 				self.mbc_ram_n
 			}
 		} else {
-				self.mbc_ram_n
+			self.mbc_ram_n
 		}
 	}
 	pub fn readbyte(&self, offset : u16) -> u8 {
@@ -178,46 +178,31 @@ impl Mem {
 			}
 		} else if offset == 0xFF02 {
 			if value == 0x81 {
-				let c = ~[self.mem[0xFF01]];
+				let c : [u8, ..1] = [self.mem[0xFF01]];
 				let cs = match from_utf8(c) {
 					Some(g) => g,
 					None => fail!("Couldn't decode character")
 				};
 				let mut stde = stderr();
-				stde.write_str(cs);
+				match stde.write_str(cs) {
+					Ok(e) => e,
+					Err(e) => fail!(e)
+				};
 				self.request_interrupt(3);
 			}
 		} else {
 			self.mem[offset as uint] = value;
 		}
 	}
-	/*
-	pub fn read(&self, offset : u16, len : u16) -> ~[u8] {
-		let mut r = ~[];
-		for i in range(0, len) {
-			r.push(self.readbyte(offset+i));
-		}
-		return r;
-	}
-	*/
-	pub fn write(&mut self, offset : u16, bytes : ~[u8]) {
+	pub fn write(&mut self, offset : u16, bytes : &[u8]) {
 		for i in range(0, bytes.len()) {
 			let b = bytes[i];
 			self.writebyte(offset+i as u16, b);
 		}
 	}
-	pub fn read16(&self, offset : u16) -> u16 {
-		self.readbyte(offset+1) as u16 << 8 | self.readbyte(offset) as u16
-	}
-	/*
-	fn write_u16(&mut self, offset : u16, value : u16) {
-		self.writebyte(offset as u16, (value & 0xFF) as u8);
-		self.writebyte(offset+1 as u16, (value >> 8) as u8);
-	}
-	*/
 	pub fn request_interrupt(&mut self, n : u8) {
 		let f = self.readbyte(0xFF0F);
-		self.writebyte(0xFF0F, f | 1 << n);
+		self.writebyte(0xFF0F, f | 1 << n as uint);
 	}
 }
 

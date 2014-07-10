@@ -1,22 +1,10 @@
 
 
 // This, like any cpu emulator, is a fucking mess.
-//use std::io::File;
 extern crate std;
-use std::io::println;
-//use std::os::args;
 use mem::Mem;
 struct Reg {
 	pub v : u16
-}
-
-pub fn sign(v : u8) -> i8 {
-	// Dunno how to cast to signed :S
-	if (v & 0x80) == 0x80 {
-		-((!v)+1) as i8
-	} else {
-		v as i8
-	}
 }
 
 impl Reg {
@@ -75,8 +63,8 @@ impl Reg {
 		(o, o-v)
 	}
 
-	fn to_bytes(&self) -> ~[u8] {
-		~[self.get_low(), self.get_high()]
+	fn to_bytes(&self) -> [u8, ..2] {
+		[self.get_low(), self.get_high()]
 	}
 }
 
@@ -102,9 +90,9 @@ impl Regs {
 	}
 }
 
-pub struct Cpu {
+pub struct Cpu<'rom> {
 	pub regs : Regs,
-	pub mem : Mem,
+	pub mem : Mem<'rom>,
 	clock : uint,
 	screen_mode : int,
 	pub drawing : bool,
@@ -114,8 +102,8 @@ pub struct Cpu {
 	log : bool,
 }
 
-impl Cpu {
-	pub fn new(rom : ~[u8]) -> Cpu {
+impl<'rom> Cpu<'rom> {
+	pub fn new<'a>(rom : &'a [u8]) -> Cpu<'a> {
 		Cpu {
 			regs : Regs::new(),
 			mem : Mem::new(rom),
@@ -139,10 +127,6 @@ impl Cpu {
 		self.set_carry_flag(new < old);
 		new
 	}
-	fn ca16(&mut self, (old, new) : (u16, u16)) -> u16 {
-		self.set_carry_flag(new < old);
-		new
-	}
 	// subtraction
 	fn cs8(&mut self, (old, new) : (u8, u8)) -> u8 {
 		self.set_carry_flag(new > old);
@@ -153,7 +137,7 @@ impl Cpu {
 		self.set_zero_flag(val == 0);
 	}
 
-	fn incflags(&mut self, (a, r) : (u8, u8)) {
+	fn incflags(&mut self, (_, r) : (u8, u8)) {
 		self.z8(r);
 		self.set_addsub_flag(false);
 		self.set_hc_flag((r&0xF) == 0);
@@ -167,13 +151,12 @@ impl Cpu {
 	}
 
 	fn addflags16(&mut self, t : (u16, u16)) {
-		let r = self.ca16(t);
 		self.set_addsub_flag(false);
 		let (a, f) = t;
 		self.set_hc_flag((f&0xFFF) < (a&0xFFF));
 	}
 
-	fn decflags(&mut self, (a, r) : (u8, u8)) {
+	fn decflags(&mut self, (_, r) : (u8, u8)) {
 		self.z8(r);
 		self.set_addsub_flag(true);
 		self.set_hc_flag((r&0xF) == 0xF);
@@ -243,7 +226,7 @@ impl Cpu {
 	}
 	fn push(&mut self, v : u16) {
 		self.regs.sp.v -= 2;
-		let m : ~[u8] = ~[(v & 0xFF) as u8, (v >> 8) as u8];
+		let m : [u8, ..2] = [(v & 0xFF) as u8, (v >> 8) as u8];
 		self.mem.write(self.regs.sp.v, m);
 	}
 	fn pop(&mut self) -> u16 {
@@ -254,7 +237,8 @@ impl Cpu {
 		r
 	}
 	fn call(&mut self, v : u16) {
-		self.push(self.regs.pc.v+1);
+		let a = self.regs.pc.v+1;
+		self.push(a);
 		self.regs.pc.v = v-1;
 	}
 	fn call_interrupt(&mut self, v : u16) {
@@ -341,7 +325,7 @@ impl Cpu {
 		self.set_hc_flag(a&0xf < (a-v)&0xf);
 	}
 	fn jr(&mut self, v : u8) {
-		self.regs.pc.v = (self.regs.pc.v as i16 + sign(v) as i16) as u16 + 1;
+		self.regs.pc.v = (self.regs.pc.v as i16 + (v as i8) as i16) as u16 + 1;
 	}
 	pub fn run_clock(&mut self) {
 		self.clock += 4; // TODO: precise cycles
@@ -442,6 +426,11 @@ impl Cpu {
 					 self.mem.read16(self.regs.hl.v+2),
 					 self.mem.read16(self.regs.hl.v+4));*/
 		}
+		// Immutable copies
+		let hl = self.regs.hl.v;
+		let bc = self.regs.bc.v;
+		let de = self.regs.de.v;
+		let af = self.regs.af.v;
 		match op {
 			0x00 => {},
 			0x01 => {self.regs.bc.v = nn; self.regs.pc.v += 2},
@@ -531,7 +520,7 @@ impl Cpu {
 				self.set_zero_flag(a == 0);
 			}
 			0x28 => if self.check_zero_flag() {self.jr(n)} else {self.regs.pc.v += 1},
-			0x29 => {let r = self.regs.hl.add(self.regs.hl.v); self.addflags16(r)},
+			0x29 => {let r = self.regs.hl.add(hl); self.addflags16(r)},
 			0x2A => {
 				let addr = self.regs.hl.v;
 				self.regs.af.set_high(self.mem.readbyte(addr));
@@ -636,7 +625,7 @@ impl Cpu {
 			0xC2 => if !self.check_zero_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			0xC3 => {self.regs.pc.v = nn-1},
 			0xC4 => {self.regs.pc.v += 2; if !self.check_zero_flag() {self.call(nn)}},
-			0xC5 => {self.push(self.regs.bc.v)},
+			0xC5 => {self.push(bc)},
 			0xC6 => {
 				let f = self.regs.af.add_high(n);
 				self.addflags(f);
@@ -685,17 +674,17 @@ impl Cpu {
 						r
 					} else if n < 0x80 { // BIT
 						let b = n >> 3 & 7;
-						let c = (x >> b) & 1;
+						let c = (x >> b as uint) & 1;
 						s.set_zero_flag(c != 1);
 						s.set_addsub_flag(false);
 						s.set_hc_flag(true);
 						x
 					} else if n < 0xC0 { // RES
 						let b = (n >> 3) & 0x7;
-						x & (0xFF ^ (1 << b))
+						x & (0xFF ^ (1 << b as uint))
 					} else { // SET
 						let b = (n >> 3) & 0x7;
-						x | (1 << b)
+						x | (1 << b as uint)
 					}
 				}
 				if n < 0x40 || n > 0x80 {
@@ -748,7 +737,7 @@ impl Cpu {
 			0xD2 => if !self.check_carry_flag() {self.regs.pc.v = nn-1} else {self.regs.pc.v += 2},
 			// D3 does not exist
 			0xD4 => {self.regs.pc.v += 2; if !self.check_carry_flag() {self.call(nn)}},
-			0xD5 => {self.push(self.regs.de.v)},
+			0xD5 => {self.push(de)},
 			0xD6 => {
 				let f = self.regs.af.sub_high(n);
 				self.subflags(f);
@@ -775,12 +764,12 @@ impl Cpu {
 				self.mem.writebyte(addr, self.regs.af.get_high());
 			},
 			// E3 and E4 do not exist
-			0xE5 => {self.push(self.regs.hl.v)},
+			0xE5 => {self.push(hl)},
 			0xE6 => {self.and(n); self.regs.pc.v += 1},
 			0xE7 => self.call(0x20),
 			0xE8 => {
 				let sp1 = self.regs.sp.v;
-				let sn = sign(n);
+				let sn = n as i8;
 				self.regs.sp.addi8(sn);
 				//self.addflags16(r);
 				let sp2 = self.regs.sp.v;
@@ -816,13 +805,12 @@ impl Cpu {
 			},
 			0xF3 => {self.di()},
 			// F4 does not exist
-			0xF5 => {self.push(self.regs.af.v)},
+			0xF5 => {self.push(af)},
 			0xF6 => {self.or(n); self.regs.pc.v += 1},
 			0xF7 => self.call(0x30),
 			0xF8 => {
 				let sp = self.regs.sp.v;
-				let hl1 = self.regs.hl.v;
-				let sn = sign(n);
+				let sn = n as i8;
 				let r = (sp as i16 + sn as i16) as u16;
 				// Also don't really know what I'm doing here
 				let f = sp as i16^sn as i16^r as i16;
