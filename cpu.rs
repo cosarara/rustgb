@@ -154,6 +154,7 @@ impl<'rom> Cpu<'rom> {
 		self.set_addsub_flag(false);
 		let (a, f) = t;
 		self.set_hc_flag((f&0xFFF) < (a&0xFFF));
+		self.set_carry_flag(f < a);
 	}
 
 	fn decflags(&mut self, (_, r) : (u8, u8)) {
