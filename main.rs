@@ -5,7 +5,7 @@ extern crate time;
 use cpu::Cpu;
 
 use sdl::video::Surface;
-use sdl::video::Color;
+//use sdl::video::Color;
 use sdl::video::RGB;
 use std::io::File;
 use std::io::println;
@@ -190,7 +190,8 @@ fn main() {
 				draw_t += 1;
 			} else {
 				draw_t = 0;
-				draw(screen, cpu.mem.mem.slice(0x8000, 0xA000), cpu.mem.mem.slice(0xFE00, 0xFEA0), lcdc);
+                // dereference and get pointer again ? WTF rust
+				draw(&*screen, cpu.mem.mem.slice(0x8000, 0xA000), cpu.mem.mem.slice(0xFE00, 0xFEA0), lcdc);
 				screen.flip();
 			}
 		}
