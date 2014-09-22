@@ -34,6 +34,7 @@ fn putpixel(screen : &Surface, x : uint, y : uint, color : u32) {
     screen.unlock();
 }
 
+#[allow(unused_variable)]
 fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface) {
 	let cols = 16u;
     for i in range(0u, 40) {
@@ -144,7 +145,7 @@ fn main() {
 	};
     	
 	let args = std::os::args();
-	let filename = args.get(1).as_slice();
+	let filename = args[1].as_slice();
 	let path = Path::new(filename);
 	let mut file = match File::open(&path) {
 		Err(why) => fail!("couldn't open {}: {}", path.display(), why.desc),
