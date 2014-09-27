@@ -34,45 +34,17 @@ fn putpixel(screen : &Surface, x : uint, y : uint, color : u32) {
     screen.unlock();
 }
 
-#[allow(unused_variable)]
-fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface) {
+fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 	let cols = 16u;
-    for i in range(0u, 40) {
-        let base = i * 4;
-        let y = oam[base] - 16;
-        let x = oam[base+1] - 8;
-        //println!("x, y : {}, {}, {}", x, y, oam[0]);
-        let tile_n = oam[base+2] as i16;
-        let attrs = oam[base+3];
-        let priority = attrs >> 7 & 1;
-        let yflip = attrs >> 6 & 1;
-        let xflip = attrs >> 5 & 1;
-        let palnum = attrs >> 4 & 1;
-
-        let sx = tile_n%(cols as i16)*8;
-        let sy = tile_n/(cols as i16)*8;
-        screen.blit_rect(t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
-            Some(sdl::Rect {x:x as i16, y:y as i16, w:8, h:8}));
-    }
-}
-
-fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
-	screen.fill_rect(Some(sdl::Rect {x: 0, y: 0, w: 160, h: 140}),
-		RGB(0xFF, 0xFF, 0xFF));
-	let t1 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
-        Ok(s) => s,
-        Err(err) => fail!("failed to set video mode: {}", err)
-	};
-	let cols = 16;
-	let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
-	for tile in range(0, 255) {
-		let taddr = tile * 16 + base_tiledata_addr;
+	//let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
+	for tile in range(0, 256) {
+		let taddr = tile * 16 + 0x800;
 		for line in range(0, 8) {
 			let laddr = (taddr + 2*line) as uint;
 			for pixel in range(0, 8) {
 				let c = vram[laddr] >> 7 - pixel & 1 |
 						(vram[laddr+1] >> 7 - pixel & 1) << 1;
-				putpixel(&t1, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
+				putpixel(t1, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
 					3 => 0 as u32,
 					2 => 0x555555 as u32,
 					1 => 0xAAAAAA as u32,
@@ -82,23 +54,135 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
 			}
 		}
 	}
+	for tile in range(0, 256) {
+		let taddr = tile * 16;
+		for line in range(0, 8) {
+			let laddr = (taddr + 2*line) as uint;
+			for pixel in range(0, 8) {
+				let c = vram[laddr] >> 7 - pixel & 1 |
+						(vram[laddr+1] >> 7 - pixel & 1) << 1;
+				putpixel(t2, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
+					3 => 0 as u32,
+					2 => 0x555555 as u32,
+					1 => 0xAAAAAA as u32,
+					0 => 0xFFFFFF as u32,
+					_ => fail!("you are terminated")
+				});
+			}
+		}
+	}
+}
+
+fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface,
+                size_8x16 : bool) {
+	let cols = 16 as i16;
+    for i in range(0u, 40) {
+        let base = i * 4;
+        let y = oam[base] as i16 - 16;
+        let x = oam[base+1] as i16 - 8;
+        if 0 > y || y > 144+16 || 0 > x || x > 160+8 {
+            continue;
+        }
+        let mut tile_n = oam[base+2] as i16;
+        if size_8x16 {
+            tile_n &= 0xFE;
+        }
+        //println!("i, x, y, tn : {}, {}, {}, {}", i, x, y, tile_n);
+        let attrs = oam[base+3];
+        let priority = attrs >> 7 & 1;
+        let yflip = attrs >> 6 & 1;
+        let xflip = attrs >> 5 & 1;
+        let palnum = attrs >> 4 & 1;
+
+        let sx = tile_n%cols*8;
+        let sy = tile_n/cols*8;
+        screen.blit_rect(t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+            Some(sdl::Rect {x:x, y:y, w:8, h:8}));
+        if size_8x16 {
+            tile_n += 1;
+            let sx = tile_n%cols*8;
+            let sy = tile_n/cols*8;
+            screen.blit_rect(t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+                Some(sdl::Rect {x:x, y:y + 8, w:8, h:8}));
+        }
+    }
+}
+
+fn draw_frame(screen : &Surface) {
+	screen.fill_rect(Some(sdl::Rect {x: 0, y: 145, w: 160, h: 1}),
+		RGB(0xFF, 0x0, 0xFF));
+	screen.fill_rect(Some(sdl::Rect {x: 0, y: 257, w: 256, h: 1}),
+		RGB(0xFF, 0x0, 0xFF));
+}
+
+fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
+	screen.fill_rect(Some(sdl::Rect {x: 0, y: 0, w: 160, h: 144}),
+		RGB(0xFF, 0xFF, 0xFF));
+	let t1 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
+        Ok(s) => s,
+        Err(err) => fail!("failed to create surface: {}", err)
+	};
+	let t2 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
+        Ok(s) => s,
+        Err(err) => fail!("failed to create surface: {}", err)
+	};
+    make_tiles(&t1, &t2, vram);
+	let cols = 16u;
 	let base_bgmap_addr = if lcdc >> 3 & 1 == 0 { 0x1800 } else { 0x1C00 };
+	let base_window_addr = if lcdc >> 6 & 1 == 0 { 0x1800 } else { 0x1C00 };
+
+	let t = if lcdc >> 4 & 1 == 0 { &t1 } else { &t2 };
+	//let t = &t1;
+
+    // BG
 	for row in range(0u, 32) {
 		for cell_n in range(0u, 32) {
 			let addr = (base_bgmap_addr+row*32+cell_n) as uint;
-			let mut tile_n = vram[addr] as i16;
+            let mut tile_n : i16 = 0;
 			if lcdc >> 4 & 1 == 0 {
-				tile_n = (tile_n as u8) as i16;
+                //tile_n = (vram as &[i8])[addr] as i16;
+                tile_n = vram[addr] as i8 as i16;
 				tile_n += 128;
-			}
+			} else {
+                tile_n = vram[addr] as i16;
+            }
 			let sx = tile_n%(cols as i16)*8;
 			let sy = tile_n/(cols as i16)*8;
-			screen.blit_rect(&t1, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+			screen.blit_rect(t, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
 				Some(sdl::Rect {x:(cell_n*8) as i16, y:(row*8) as i16, w:8, h:8}));
 		}
 	}
-    draw_sprites(screen, vram, oam, &t1);
-	screen.blit_at(&t1, 0, 260);
+
+    // Window
+    // TODO - dunno what to do. kirby seems to enable it but it shouldn't
+    let window_enabled = lcdc >> 5 & 1 == 1 && false;
+    if window_enabled {
+        for row in range(0u, 32) {
+            for cell_n in range(0u, 32) {
+                let addr = (base_window_addr+row*32+cell_n) as uint;
+                let mut tile_n : i16 = 0;
+                if lcdc >> 4 & 1 == 0 {
+                    //tile_n = (vram as &[i8])[addr] as i16;
+                    tile_n = vram[addr] as i8 as i16;
+                    tile_n += 128;
+                } else {
+                    tile_n = vram[addr] as i16;
+                }
+                let sx = tile_n%(cols as i16)*8;
+                let sy = tile_n/(cols as i16)*8;
+                screen.blit_rect(t, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+                    Some(sdl::Rect {x:(cell_n*8) as i16, y:(row*8) as i16, w:8, h:8}));
+            }
+        }
+    }
+
+    if (lcdc >> 1 & 1) == 1 {
+        let sprite_size = (lcdc >> 2 & 1) == 1;
+        draw_sprites(screen, vram, oam, &t2, sprite_size);
+    }
+	screen.blit_at(&t1, 0, 258);
+	screen.blit_at(&t2, 256, 258);
+    draw_frame(screen);
 }
 
 #[test]
@@ -196,7 +280,7 @@ fn main() {
 				screen.flip();
 			}
 		}
-		if events_t < 1000 {
+		if events_t < 10 {
 			events_t += 1;
 			continue;
 		}

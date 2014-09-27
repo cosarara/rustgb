@@ -680,8 +680,8 @@ impl<'rom> Cpu<'rom> {
 						s.set_hc_flag(true);
 						x
 					} else if n < 0xC0 { // RES
-						let b = (n >> 3) & 0x7;
-						x & (0xFF ^ (1 << b as uint))
+						let b = ((n >> 3) & 0x7) as uint;
+						x & (0xFF as u8 ^ (1u << b) as u8)
 					} else { // SET
 						let b = (n >> 3) & 0x7;
 						x | (1 << b as uint)
