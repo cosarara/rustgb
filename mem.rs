@@ -101,7 +101,7 @@ impl<'rom> Mem<'rom> {
 	}
 	pub fn readbyte(&self, offset : u16) -> u8 {
 		if offset <= 0x3FFF {
-			self.rom[offset as uint ]
+			self.rom[offset as uint]
 		} else if offset <= 0x7FFF {
 			if self.mbc_type > 0 {
 				self.rom[offset as uint+0x4000*(self.rom_bank()-1)]
