@@ -687,7 +687,7 @@ impl<'rom> Cpu<'rom> {
 						x | (1 << b as uint)
 					}
 				}
-				if n < 0x40 || n > 0x80 {
+				if n < 0x40 || n >= 0x80 {
 					match n & 7 {
 						0 => {let x = self.regs.bc.get_high();
 							let r = f(self, n, x); self.regs.bc.set_high(r)},
