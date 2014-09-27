@@ -14,3 +14,11 @@ clean:
 	rm main
 
 all: main
+
+%.o : %.asm
+	rgbasm $< -o $@
+
+%.gb : %.o
+	rgblink $< -o $@
+	rgbfix $@
+
