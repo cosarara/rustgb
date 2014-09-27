@@ -90,6 +90,7 @@ fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface,
         //println!("i, x, y, tn : {}, {}, {}, {}", i, x, y, tile_n);
         let attrs = oam[base+3];
         let priority = attrs >> 7 & 1;
+        // TODO: actually flip
         let yflip = attrs >> 6 & 1;
         let xflip = attrs >> 5 & 1;
         let palnum = attrs >> 4 & 1;
@@ -243,7 +244,7 @@ fn main() {
 	let rom_contents : &[u8] = result.slice_to(min(0x100000, result.len()-1));
 	let game_title = match std::str::from_utf8(rom_contents.slice(0x134, 0x143)) {
 		Some(g) => g,
-		None => fail!("Couldn't decode game title")
+		None => "UNKNOWN" //fail!("Couldn't decode game title")
 	};
 	println(game_title);
 	let cart_type = rom_contents[0x147];
