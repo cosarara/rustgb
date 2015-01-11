@@ -1,8 +1,8 @@
-main
 .*.sw?
 *.gb
 *.gbc
 *.sav
 *.log
-rust-sdl/
-roms/
+/roms/
+/target
+/Cargo.lock

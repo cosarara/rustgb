@@ -9,7 +9,7 @@ struct Reg {
 
 impl Reg {
 	fn set_high(&mut self, v : u8) {
-		self.v = (v as u16 << 8) | (self.v & 0xFF) as u16;
+		self.v = ((v as u16) << 8) | (self.v & 0xFF) as u16;
 	}
 	fn set_low(&mut self, v : u8) {
 		self.v = (self.v & 0xFF00) as u16 | v as u16
@@ -63,7 +63,7 @@ impl Reg {
 		(o, o-v)
 	}
 
-	fn to_bytes(&self) -> [u8, ..2] {
+	fn to_bytes(&self) -> [u8; 2] {
 		[self.get_low(), self.get_high()]
 	}
 }
@@ -227,13 +227,13 @@ impl<'rom> Cpu<'rom> {
 	}
 	fn push(&mut self, v : u16) {
 		self.regs.sp.v -= 2;
-		let m : [u8, ..2] = [(v & 0xFF) as u8, (v >> 8) as u8];
-		self.mem.write(self.regs.sp.v, m);
+		let m : [u8; 2] = [(v & 0xFF) as u8, (v >> 8) as u8];
+		self.mem.write(self.regs.sp.v, m.as_slice());
 	}
 	fn pop(&mut self) -> u16 {
 		let mut r = self.mem.readbyte(self.regs.sp.v) as u16;
 		self.regs.sp.v += 1;
-		r |= self.mem.readbyte(self.regs.sp.v) as u16 << 8;
+		r |= (self.mem.readbyte(self.regs.sp.v) as u16) << 8;
 		self.regs.sp.v += 1;
 		r
 	}
@@ -371,7 +371,7 @@ impl<'rom> Cpu<'rom> {
 					self.screen_mode = 0;
 				}
 			},
-			_ => fail!("Wat"),
+			_ => panic!("Wat"),
 		}
 		let tcontrol = self.mem.readbyte(0xFF07);
 		let tspeed = tcontrol & 3;
@@ -387,7 +387,7 @@ impl<'rom> Cpu<'rom> {
 				1 => 1,
 				2 => 4,
 				3 => 16,
-				_ => fail!("Do you even binary?")
+				_ => panic!("Do you even binary?")
 			};
 			let mut count = self.mem.readbyte(0xFF05);
 			if tclock % a == 0 {
@@ -405,11 +405,11 @@ impl<'rom> Cpu<'rom> {
 		//if self.regs.pc.v == 0x03C6 {
 		//	let mut file = File::create(&Path::new("ram_dump.bin"));
 		//	file.write(self.mem.mem);
-		//	fail!("quit")
+		//	panic!("quit")
 		//}
 		let op : u8 = self.mem.readbyte(self.regs.pc.v);
 		let n : u8 = self.mem.readbyte(self.regs.pc.v+1);
-		let nn : u16 = n as u16 | self.mem.readbyte(self.regs.pc.v+2) as u16 << 8;
+		let nn : u16 = n as u16 | (self.mem.readbyte(self.regs.pc.v+2) as u16) << 8;
 		if self.log && !(op == 0x76 && self.last_op == 0x76) {
 			/*println!("PC: {:04X} | OPCODE: {:02X} | MEM: {:02X}{:02X}",
 				self.regs.pc.v, op, n, nn>>8);
@@ -446,7 +446,7 @@ impl<'rom> Cpu<'rom> {
 				self.set_zero_flag(false);
 			},
 			0x08 => {
-				self.mem.write(nn, self.regs.sp.to_bytes());
+				self.mem.write(nn, self.regs.sp.to_bytes().as_slice());
 				self.regs.pc.v += 2},
 			0x09 => {let r = self.regs.hl.add(self.regs.bc.v); self.addflags16(r)},
 			0x0A => {self.regs.af.set_high(self.mem.readbyte(self.regs.bc.v))},
@@ -460,7 +460,7 @@ impl<'rom> Cpu<'rom> {
 				self.regs.af.set_high(b);
 				self.set_zero_flag(false);
 			},
-			0x10 => {fail!("STOP")},
+			0x10 => {panic!("STOP")},
 			0x11 => {self.regs.de.v = nn; self.regs.pc.v += 2},
 			0x12 => {self.mem.writebyte(self.regs.de.v, self.regs.af.get_high())},
 			0x13 => {self.regs.de.v += 1},
@@ -573,7 +573,7 @@ impl<'rom> Cpu<'rom> {
 				self.set_addsub_flag(false);
 				self.set_hc_flag(false);
 			},
-			0x40..0xBF => {
+			0x40...0xBF => {
 				let b = match op & 0x7 {
 					0 => self.regs.bc.get_high(),
 					1 => self.regs.bc.get_low(),
@@ -583,40 +583,40 @@ impl<'rom> Cpu<'rom> {
 					5 => self.regs.hl.get_low(),
 					6 => self.mem.readbyte(self.regs.hl.v),
 					7 => self.regs.af.get_high(),
-					_ => fail!("wat")
+					_ => panic!("wat")
 				};
 				match op {
-					0x40..0x47 => self.regs.bc.set_high(b),
-					0x48..0x4F => self.regs.bc.set_low(b),
-					0x50..0x57 => self.regs.de.set_high(b),
-					0x58..0x5F => self.regs.de.set_low(b),
-					0x60..0x67 => self.regs.hl.set_high(b),
-					0x68..0x6F => self.regs.hl.set_low(b),
-					0x70..0x77 => if op == 0x76 {
+					0x40...0x47 => self.regs.bc.set_high(b),
+					0x48...0x4F => self.regs.bc.set_low(b),
+					0x50...0x57 => self.regs.de.set_high(b),
+					0x58...0x5F => self.regs.de.set_low(b),
+					0x60...0x67 => self.regs.hl.set_high(b),
+					0x68...0x6F => self.regs.hl.set_low(b),
+					0x70...0x77 => if op == 0x76 {
 						self.halted = true;
 						self.regs.pc.v -= 1; // Just wait here ok?
 						//if !self.interrupts_enabled || self.mem.readbyte(0xFFFF) == 0 {
-						//	fail!("Halt with interrupts disabled, I don't know what to do.");
+						//	panic!("Halt with interrupts disabled, I don't know what to do.");
 						//}
 						//println!("ie {:X}", self.mem.readbyte(0xFFFF));
 						//println!("tc {:X}", self.mem.readbyte(0xFF07));
 					} else {
 						self.mem.writebyte(self.regs.hl.v, b)
 					},
-					0x78..0x7F => self.regs.af.set_high(b),
-					0x80..0x87 => {
+					0x78...0x7F => self.regs.af.set_high(b),
+					0x80...0x87 => {
 						let f = self.regs.af.add_high(b);
 						self.addflags(f)},
-					0x88..0x8F => self.adc(b), //ADC
-					0x90..0x97 => {
+					0x88...0x8F => self.adc(b), //ADC
+					0x90...0x97 => {
 						let f = self.regs.af.sub_high(b);
 						self.subflags(f)},
-					0x98..0x9F => self.sbc(b), //SBC
-					0xA0..0xA7 => {self.and(b)}
-					0xA8..0xAF => {self.xor(b)}
-					0xB0..0xB7 => {self.or(b)}
-					0xB8..0xBF => {self.cp(b)}
-					_ => fail!("crash and burn : {:X}", op)
+					0x98...0x9F => self.sbc(b), //SBC
+					0xA0...0xA7 => {self.and(b)}
+					0xA8...0xAF => {self.xor(b)}
+					0xB0...0xB7 => {self.or(b)}
+					0xB8...0xBF => {self.cp(b)}
+					_ => panic!("crash and burn : {:X}", op)
 				}
 			},
 
@@ -707,7 +707,7 @@ impl<'rom> Cpu<'rom> {
 							self.mem.writebyte(a, r)},
 						7 => {let x = self.regs.af.get_high();
 							let r = f(self, n, x); self.regs.af.set_high(r)},
-						_ => fail!("wat.")
+						_ => panic!("wat.")
 					}
 				} else {
 					match n & 7 {
@@ -721,7 +721,7 @@ impl<'rom> Cpu<'rom> {
 							let x = self.mem.readbyte(a);
 							f(self, n, x);},
 						7 => {let x = self.regs.af.get_high(); f(self, n, x);},
-						_ => fail!("wat.")
+						_ => panic!("wat.")
 					}
 				}
 				self.regs.pc.v += 1;
@@ -829,7 +829,7 @@ impl<'rom> Cpu<'rom> {
 			// FC and FD do not exist
 			0xFE => {self.regs.pc.v += 1; self.cp(n)},
 			0xFF => self.call(0x38),
-			_ => {fail!("Unimplemented OP: {:X}h", op)},
+			_ => {panic!("Unimplemented OP: {:X}h", op)},
 		}
 
 		self.regs.pc.v += 1;
@@ -843,7 +843,7 @@ impl<'rom> Cpu<'rom> {
 				0
 			},
 			2 => 1,
-			_ => fail!("Unexpected IME delay")};
+			_ => panic!("Unexpected IME delay")};
 		for n in range(0, 4) {
 			if !self.interrupts_enabled && !self.halted {
 				return;
@@ -854,7 +854,7 @@ impl<'rom> Cpu<'rom> {
 				2 => 0x50,
 				3 => 0x58,
 				4 => 0x60,
-				_ => fail!("Interrupt codes go from 0 to 4"),
+				_ => panic!("Interrupt codes go from 0 to 4"),
 			};
 			let e = self.mem.readbyte(0xFFFF);
 			let f = self.mem.readbyte(0xFF0F);

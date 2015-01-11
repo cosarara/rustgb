@@ -8,7 +8,7 @@ pub struct Mem<'rom> {
 	pub mbc_ram_n : u8,
 	pub mbc_romram : bool,
 	pub mbc_ram_enable : bool,
-	pub mem : [u8, ..0x10000],
+	pub mem : [u8; 0x10000],
 	pub rom : &'rom [u8],
 	buttons : bool,
 	pub kup : bool,
@@ -24,7 +24,7 @@ pub struct Mem<'rom> {
 
 impl<'rom> Mem<'rom> {
 	pub fn new<'a>(rom : &'a [u8]) -> Mem<'a> {
-		let mut mem = [0, ..0x10000];
+		let mut mem : [u8; 0x10000] = [0; 0x10000];
 		mem[0xFF40] = 0x91;
 		mem[0xFF47] = 0xFC;
 		mem[0xFF48] = 0xFF;
@@ -33,14 +33,14 @@ impl<'rom> Mem<'rom> {
 		mem[0xFFFF] = 0;
 		let mbc_type = match rom[0x147] {
 			0 => 0,
-			0x1..0x3 => 1,
-			0x5..0x6 => 2,
-			0x8..0x9 => 0,
-			0xB..0xD => fail!("Cart type not supported: 0x{:X} (mmm)", rom[0x147]),
-			0xF..0x13 => 3,
-			0x15..0x17 => 4,
-			0x19..0x1E => 5,
-			_ => fail!("Cart type not supported: 0x{:X} (weird thing)", rom[0x147]),
+			0x1...0x3 => 1,
+			0x5...0x6 => 2,
+			0x8...0x9 => 0,
+			0xB...0xD => panic!("Cart type not supported: 0x{:X} (mmm)", rom[0x147]),
+			0xF...0x13 => 3,
+			0x15...0x17 => 4,
+			0x19...0x1E => 5,
+			_ => panic!("Cart type not supported: 0x{:X} (weird thing)", rom[0x147]),
 		};
 		Mem {
 			mbc_type : mbc_type,
@@ -64,10 +64,10 @@ impl<'rom> Mem<'rom> {
 	}
 	pub fn rom_bank(&self) -> uint {
 		if self.mbc_type == 2 {
-			fail!("TODO");
+			panic!("TODO");
 		} else if self.mbc_type == 1 {
 			let mut n = if self.mbc_romram {
-				self.mbc_rom_low as uint | self.mbc_ram_n as uint << 5
+				self.mbc_rom_low as uint | (self.mbc_ram_n as uint) << 5
 			} else {
 				self.mbc_rom_low as uint
 			};
@@ -84,7 +84,7 @@ impl<'rom> Mem<'rom> {
 				self.mbc_rom_low as uint
 			}
 		} else {
-			fail!("lel");
+			panic!("lel");
 		}
 	}
 	#[allow(dead_code)]
@@ -111,15 +111,15 @@ impl<'rom> Mem<'rom> {
 		} else if offset == 0xFF00 {
 			let a = if self.buttons {
 				!self.ka as u8 |
-				!self.kb as u8 << 1 |
-				!self.kselect as u8 << 2 |
-				!self.kstart as u8 << 3 |
+				(!self.kb as u8) << 1 |
+				(!self.kselect as u8) << 2 |
+				(!self.kstart as u8) << 3 |
 				0x10
 			} else {
 				!self.kright as u8 |
-				!self.kleft as u8 << 1 |
-				!self.kup as u8 << 2 |
-				!self.kdown as u8 << 3 |
+				(!self.kleft as u8) << 1 |
+				(!self.kup as u8) << 2 |
+				(!self.kdown as u8) << 3 |
 				0x20
 			};
 			a | 0xC0
@@ -181,15 +181,15 @@ impl<'rom> Mem<'rom> {
 			}
 		} else if offset == 0xFF02 {
 			if value == 0x81 {
-				let c : [u8, ..1] = [self.mem[0xFF01]];
-				let cs = match from_utf8(c) {
-					Some(g) => g,
-					None => fail!("Couldn't decode character")
+				let c : [u8; 1] = [self.mem[0xFF01]];
+				let cs = match from_utf8(c.as_slice()) {
+					Ok(g) => g,
+					Err(e) => panic!("Couldn't decode character")
 				};
 				let mut stde = stderr();
 				match stde.write_str(cs) {
 					Ok(e) => e,
-					Err(e) => fail!(e)
+					Err(e) => panic!(e)
 				};
 				self.request_interrupt(3);
 			}
@@ -197,7 +197,7 @@ impl<'rom> Mem<'rom> {
             self.mem[0xFF04] = 0;
         } else if offset == 0xFF46 { // OAM DMA Transfer
             for i in range(0u, 100) {
-                let s = value as uint << 8 | i;
+                let s = (value as uint) << 8 | i;
                 let d = 0xFE00 | i;
                 self.mem[d] = self.mem[s];
             }
