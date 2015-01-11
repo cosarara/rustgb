@@ -1,15 +1,19 @@
 
 extern crate sdl;
 extern crate time;
+extern crate getopts;
 
 use cpu::Cpu;
 
 use sdl::video::Surface;
+use sdl::video::{SurfaceFlag, VideoFlag};
 //use sdl::video::Color;
 use sdl::video::RGB;
 use std::io::File;
 use std::io::println;
 use std::cmp::min;
+use std::os;
+use getopts::{optopt,optflag,getopts,OptGroup,usage};
 use time::now_utc;
 
 mod cpu;
@@ -49,7 +53,7 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 					2 => 0x555555 as u32,
 					1 => 0xAAAAAA as u32,
 					0 => 0xFFFFFF as u32,
-					_ => fail!("you are terminated")
+					_ => panic!("you are terminated")
 				});
 			}
 		}
@@ -66,7 +70,7 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 					2 => 0x555555 as u32,
 					1 => 0xAAAAAA as u32,
 					0 => 0xFFFFFF as u32,
-					_ => fail!("you are terminated")
+					_ => panic!("you are terminated")
 				});
 			}
 		}
@@ -120,11 +124,11 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
 		RGB(0xFF, 0xFF, 0xFF));
 	let t1 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
         Ok(s) => s,
-        Err(err) => fail!("failed to create surface: {}", err)
+        Err(err) => panic!("failed to create surface: {}", err)
 	};
 	let t2 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
         Ok(s) => s,
-        Err(err) => fail!("failed to create surface: {}", err)
+        Err(err) => panic!("failed to create surface: {}", err)
 	};
     make_tiles(&t1, &t2, vram);
 	let cols = 16u;
@@ -218,32 +222,58 @@ fn test_instr() {
 	}
 }
 
+fn print_usage(program: &str, opts: &[OptGroup]) {
+    let descr = "Emulates a gameboy ROM image in FILE.";
+    let help = format!("Usage: {} [OPTION]... [FILE]\n{}", program, descr);
+    print!("{}", usage(help.as_slice(), opts));
+}
+
 fn main() {
-	sdl::init([sdl::InitVideo]);
+    let args: Vec<String> = os::args();
+    let program = args[0].clone();
+    let opts = &[
+        optflag("h", "help", "Print this help menu")
+    ];
+    let matches = match getopts(args.tail(), opts) {
+        Ok(m) => { m }
+        Err(f) => { panic!(f.to_string()) }
+    };
+    if matches.opt_present("h") {
+        print_usage(program.as_slice(), opts);
+        return;
+    }
+    if matches.free.is_empty() {
+        println("Error: What ROM do you want to emulate?");
+        print_usage(program.as_slice(), opts);
+        return;
+    }
+
+	sdl::init([sdl::InitFlag::Video].as_slice());
 	sdl::wm::set_caption("rustgb", "rust-sdl");
 	//let screen : ~Surface = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
-	let screen : Box<Surface> = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
-	                                                            [sdl::video::DoubleBuf]) {
-	    Ok(screen) => box screen,
-	    Err(err) => fail!("failed to set video mode: {}", err)
+	let screen : Box<Surface> = match sdl::video::set_video_mode(500, 500, 32,
+                                                                 [SurfaceFlag::HWSurface].as_slice(),
+	                                                             [VideoFlag::DoubleBuf].as_slice()) {
+	    Ok(screen) => Box::new(screen),
+	    Err(err) => panic!("failed to set video mode: {}", err)
 	};
-    	
+ 
 	let args = std::os::args();
 	let filename = args[1].as_slice();
 	let path = Path::new(filename);
 	let mut file = match File::open(&path) {
-		Err(why) => fail!("couldn't open {}: {}", path.display(), why.desc),
+		Err(why) => panic!("couldn't open {}: {}", path.display(), why.desc),
 		Ok(file) => file,
 	};
 	let result = match file.read_to_end() {
 		Ok(r) => r,
-		Err(e) => fail!("failed to read file: {}", e)
+		Err(e) => panic!("failed to read file: {}", e)
 	};
 	//let rom_contents = result.slice_to(result.len()-1);
 	let rom_contents : &[u8] = result.slice_to(min(0x100000, result.len()-1));
 	let game_title = match std::str::from_utf8(rom_contents.slice(0x134, 0x143)) {
-		Some(g) => g,
-		None => fail!("Couldn't decode game title")
+		Ok(g) => g,
+		Err(e) => panic!("Couldn't decode game title")
 	};
 	println(game_title);
 	let cart_type = rom_contents[0x147];
