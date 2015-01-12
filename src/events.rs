@@ -3,7 +3,7 @@ extern crate sdl;
 use cpu::Cpu;
 use sdl::event::{Event, Key};
 
-pub fn events(cpu : &mut Cpu) -> int {
+pub fn events(cpu : &mut Cpu) -> isize {
 	match sdl::event::poll_event() {
 		Event::None => return 1,
 		Event::Quit => return 2,

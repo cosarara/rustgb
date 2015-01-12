@@ -1,3 +1,4 @@
+#![allow(unstable)]
 
 extern crate sdl;
 extern crate time;
@@ -13,7 +14,7 @@ use std::io::File;
 use std::io::println;
 use std::cmp::min;
 use std::os;
-use getopts::{optopt,optflag,getopts,OptGroup,usage};
+use getopts::{optflag,getopts,OptGroup,usage};
 use time::now_utc;
 
 mod cpu;
@@ -26,29 +27,29 @@ pub fn current_time_millis() -> u64 {
 	(tm.tm_sec as u64) * 1000 + (tm.tm_nsec as u64) / 1000
 }
 
-fn putpixel(screen : &Surface, x : uint, y : uint, color : u32) {
+fn putpixel(screen : &Surface, x : usize, y : usize, color : u32) {
     screen.lock();
     unsafe {
-        let pitch = (*screen.raw).pitch as uint;
-        let h = (*screen.raw).h as uint;
+        let pitch = (*screen.raw).pitch as usize;
+        let h = (*screen.raw).h as usize;
         let p = y * (pitch / std::mem::size_of_val(&(0 as u32))) + x;
-        let pixels: &mut [u32] = std::mem::transmute(((*screen.raw).pixels, (h*pitch) as uint));
+        let pixels: &mut [u32] = std::mem::transmute(((*screen.raw).pixels, (h*pitch) as usize));
         pixels[p] = color as u32;
     }
     screen.unlock();
 }
 
 fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
-	let cols = 16u;
+	let cols = 16;
 	//let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
 	for tile in range(0, 256) {
 		let taddr = tile * 16 + 0x800;
 		for line in range(0, 8) {
-			let laddr = (taddr + 2*line) as uint;
+			let laddr = (taddr + 2*line) as usize;
 			for pixel in range(0, 8) {
 				let c = vram[laddr] >> 7 - pixel & 1 |
 						(vram[laddr+1] >> 7 - pixel & 1) << 1;
-				putpixel(t1, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
+				putpixel(t1, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
 					3 => 0 as u32,
 					2 => 0x555555 as u32,
 					1 => 0xAAAAAA as u32,
@@ -61,11 +62,11 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 	for tile in range(0, 256) {
 		let taddr = tile * 16;
 		for line in range(0, 8) {
-			let laddr = (taddr + 2*line) as uint;
+			let laddr = (taddr + 2*line) as usize;
 			for pixel in range(0, 8) {
 				let c = vram[laddr] >> 7 - pixel & 1 |
 						(vram[laddr+1] >> 7 - pixel & 1) << 1;
-				putpixel(t2, (tile%cols*8+pixel) as uint, (tile/cols*8+line) as uint, match c {
+				putpixel(t2, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
 					3 => 0 as u32,
 					2 => 0x555555 as u32,
 					1 => 0xAAAAAA as u32,
@@ -77,10 +78,11 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 	}
 }
 
+#[allow(unused_variables)]
 fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface,
                 size_8x16 : bool) {
 	let cols = 16 as i16;
-    for i in range(0u, 40) {
+    for i in range(0, 40) {
         let base = i * 4;
         let y = oam[base] as i16 - 16;
         let x = oam[base+1] as i16 - 8;
@@ -132,7 +134,7 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
         Err(err) => panic!("failed to create surface: {}", err)
 	};
     make_tiles(&t1, &t2, vram);
-	let cols = 16u;
+	let cols = 16;
 	let base_bgmap_addr = if lcdc >> 3 & 1 == 0 { 0x1800 } else { 0x1C00 };
 	let base_window_addr = if lcdc >> 6 & 1 == 0 { 0x1800 } else { 0x1C00 };
 
@@ -140,10 +142,10 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
 	//let t = &t1;
 
     // BG
-	for row in range(0u, 32) {
-		for cell_n in range(0u, 32) {
-			let addr = (base_bgmap_addr+row*32+cell_n) as uint;
-            let mut tile_n : i16 = 0;
+	for row in range(0, 32) {
+		for cell_n in range(0, 32) {
+			let addr = (base_bgmap_addr+row*32+cell_n) as usize;
+            let mut tile_n : i16;
 			if lcdc >> 4 & 1 == 0 {
                 //tile_n = (vram as &[i8])[addr] as i16;
                 tile_n = vram[addr] as i8 as i16;
@@ -162,10 +164,10 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
     // TODO - dunno what to do. kirby seems to enable it but it shouldn't
     let window_enabled = lcdc >> 5 & 1 == 1 && false;
     if window_enabled {
-        for row in range(0u, 32) {
-            for cell_n in range(0u, 32) {
-                let addr = (base_window_addr+row*32+cell_n) as uint;
-                let mut tile_n : i16 = 0;
+        for row in range(0, 32) {
+            for cell_n in range(0, 32) {
+                let addr = (base_window_addr+row*32+cell_n) as usize;
+                let mut tile_n : i16;
                 if lcdc >> 4 & 1 == 0 {
                     //tile_n = (vram as &[i8])[addr] as i16;
                     tile_n = vram[addr] as i8 as i16;
@@ -206,7 +208,7 @@ fn test_instr() {
 		//cpu.regs.bc.v = (i & 0xFF00);
 		println!("input: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
 		cpu.next();
-		//let line = lines[i as uint].clone();
+		//let line = lines[i as usize].clone();
 		//let mut it = line.split_str(",");
 		//let afs = it.next().unwrap();
 		//let bcs_t = it.next().unwrap();
@@ -274,16 +276,16 @@ fn main() {
 	let rom_contents : &[u8] = result.slice_to(min(0x100000, result.len()-1));
 	let game_title = match std::str::from_utf8(rom_contents.slice(0x134, 0x143)) {
 		Ok(g) => g,
-		Err(e) => "UNKNOWN"
+		Err(_) => "UNKNOWN"
 	};
 	println(game_title);
 	let cart_type = rom_contents[0x147];
 	println!("cart type: {:X}", cart_type);
 	let mut cpu = Cpu::new(rom_contents);
 	//let mut start_time = current_time_millis();
-	let mut events_t = 0u;
-	let mut draw_t = 0u;
-	//let mut time = 0u;
+	let mut events_t = 0;
+	let mut draw_t = 0;
+	//let mut time = 0;
 	'main : loop {
 		/*
 		if time < 1000000 {

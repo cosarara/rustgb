@@ -1,5 +1,3 @@
-
-
 // This, like any cpu emulator, is a fucking mess.
 extern crate std;
 use mem::Mem;
@@ -93,8 +91,8 @@ impl Regs {
 pub struct Cpu<'rom> {
 	pub regs : Regs,
 	pub mem : Mem<'rom>,
-	clock : uint,
-	screen_mode : int,
+	clock : usize,
+	screen_mode : isize,
 	pub drawing : bool,
 	interrupts_enabled : bool,
 	last_op : u8,
@@ -175,7 +173,7 @@ impl<'rom> Cpu<'rom> {
 		let a = self.regs.af.get_high();
 		let f = self.regs.af.add_high(b+c);
 		self.addflags(f);
-		let adc : uint = a as uint + b as uint + c as uint;
+		let adc : usize = a as usize + b as usize + c as usize;
 		self.set_carry_flag(adc > 0xFF);
 		let h = (a & 0xF) + (b & 0xF) + c > 0xF;
 		self.set_hc_flag(h);
@@ -186,8 +184,8 @@ impl<'rom> Cpu<'rom> {
 		let a = self.regs.af.get_high();
 		let f = self.regs.af.sub_high(b+c as u8);
 		self.subflags(f);
-		let h : bool = ((a & 0xF) as int - (b & 0xF) as int - c as int) < 0 as int;
-		let sbc : int = a as int - b as int - c as int;
+		let h : bool = ((a & 0xF) as isize - (b & 0xF) as isize - c as isize) < 0 as isize;
+		let sbc : isize = a as isize - b as isize - c as isize;
 		self.set_carry_flag(sbc < 0);
 		self.set_hc_flag(h);
 	}
@@ -596,7 +594,7 @@ impl<'rom> Cpu<'rom> {
 						self.halted = true;
 						self.regs.pc.v -= 1; // Just wait here ok?
 						//if !self.interrupts_enabled || self.mem.readbyte(0xFFFF) == 0 {
-						//	panic!("Halt with interrupts disabled, I don't know what to do.");
+						//	panic!("Halt with isizeerrupts disabled, I don't know what to do.");
 						//}
 						//println!("ie {:X}", self.mem.readbyte(0xFFFF));
 						//println!("tc {:X}", self.mem.readbyte(0xFF07));
@@ -674,17 +672,17 @@ impl<'rom> Cpu<'rom> {
 						r
 					} else if n < 0x80 { // BIT
 						let b = n >> 3 & 7;
-						let c = (x >> b as uint) & 1;
+						let c = (x >> b as usize) & 1;
 						s.set_zero_flag(c != 1);
 						s.set_addsub_flag(false);
 						s.set_hc_flag(true);
 						x
 					} else if n < 0xC0 { // RES
-						let b = ((n >> 3) & 0x7) as uint;
-						x & (0xFF as u8 ^ (1u << b) as u8)
+						let b = ((n >> 3) & 0x7) as usize;
+						x & (0xFF as u8 ^ (1 << b) as u8)
 					} else { // SET
 						let b = (n >> 3) & 0x7;
-						x | (1 << b as uint)
+						x | (1 << b as usize)
 					}
 				}
 				if n < 0x40 || n >= 0x80 {
@@ -861,7 +859,7 @@ impl<'rom> Cpu<'rom> {
 			if (f & e) >> n & 1 != 1 {
 				continue;
 			}
-			//println!("Calling int {:X}h", a);
+			//println!("Calling isize {:X}h", a);
 			if !self.halted {
 				self.mem.writebyte(0xFF0F, f ^ 1 << n);
 				self.call_interrupt(a);

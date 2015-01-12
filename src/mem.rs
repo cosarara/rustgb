@@ -1,4 +1,3 @@
-
 use std::str::from_utf8;
 use std::io::stderr;
 
@@ -62,26 +61,26 @@ impl<'rom> Mem<'rom> {
 			ime_delay : 0,
 		}
 	}
-	pub fn rom_bank(&self) -> uint {
+	pub fn rom_bank(&self) -> usize {
 		if self.mbc_type == 2 {
 			panic!("TODO");
 		} else if self.mbc_type == 1 {
 			let mut n = if self.mbc_romram {
-				self.mbc_rom_low as uint | (self.mbc_ram_n as uint) << 5
+				self.mbc_rom_low as usize | (self.mbc_ram_n as usize) << 5
 			} else {
-				self.mbc_rom_low as uint
+				self.mbc_rom_low as usize
 			};
 			if n == 0 {
 				n = 1;
 			}
 			n
 		} else if self.mbc_type == 3 {
-			self.mbc_rom_low as uint
+			self.mbc_rom_low as usize
 		} else if self.mbc_type == 5 {
 			if self.mbc_romram {
-				self.mbc_rom_low as uint | 1 << 9
+				self.mbc_rom_low as usize | 1 << 9
 			} else {
-				self.mbc_rom_low as uint
+				self.mbc_rom_low as usize
 			}
 		} else {
 			panic!("lel");
@@ -101,12 +100,12 @@ impl<'rom> Mem<'rom> {
 	}
 	pub fn readbyte(&self, offset : u16) -> u8 {
 		if offset <= 0x3FFF {
-			self.rom[offset as uint]
+			self.rom[offset as usize]
 		} else if offset <= 0x7FFF {
 			if self.mbc_type > 0 {
-				self.rom[offset as uint+0x4000*(self.rom_bank()-1)]
+				self.rom[offset as usize+0x4000*(self.rom_bank()-1)]
 			} else {
-				self.rom[offset as uint]
+				self.rom[offset as usize]
 			}
 		} else if offset == 0xFF00 {
 			let a = if self.buttons {
@@ -124,11 +123,11 @@ impl<'rom> Mem<'rom> {
 			};
 			a | 0xC0
 		} else {
-			self.mem[offset as uint]
+			self.mem[offset as usize]
 		}
 	}
     pub fn force_writebyte(&mut self, offset : u16, value : u8) {
-        self.mem[offset as uint] = value;
+        self.mem[offset as usize] = value;
     }
 	pub fn writebyte(&mut self, offset : u16, value : u8) {
 		//println!("Written {:X} to {:X}", value, offset);
@@ -184,7 +183,7 @@ impl<'rom> Mem<'rom> {
 				let c : [u8; 1] = [self.mem[0xFF01]];
 				let cs = match from_utf8(c.as_slice()) {
 					Ok(g) => g,
-					Err(e) => panic!("Couldn't decode character")
+					Err(_) => panic!("Couldn't decode character")
 				};
 				let mut stde = stderr();
 				match stde.write_str(cs) {
@@ -196,13 +195,13 @@ impl<'rom> Mem<'rom> {
         } else if offset == 0xFF04 {
             self.mem[0xFF04] = 0;
         } else if offset == 0xFF46 { // OAM DMA Transfer
-            for i in range(0u, 100) {
-                let s = (value as uint) << 8 | i;
+            for i in range(0, 100) {
+                let s = (value as usize) << 8 | i;
                 let d = 0xFE00 | i;
                 self.mem[d] = self.mem[s];
             }
 		} else {
-			self.mem[offset as uint] = value;
+			self.mem[offset as usize] = value;
 		}
 	}
 	pub fn write(&mut self, offset : u16, bytes : &[u8]) {
@@ -213,7 +212,7 @@ impl<'rom> Mem<'rom> {
 	}
 	pub fn request_interrupt(&mut self, n : u8) {
 		let f = self.readbyte(0xFF0F);
-		self.writebyte(0xFF0F, f | 1 << n as uint);
+		self.writebyte(0xFF0F, f | 1 << n as usize);
 	}
 }
 
