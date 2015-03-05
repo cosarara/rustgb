@@ -101,7 +101,7 @@ pub struct Cpu<'rom> {
 }
 
 impl<'rom> Cpu<'rom> {
-	pub fn new<'a>(rom : &'a [u8]) -> Cpu<'a> {
+	pub fn new<'a>(rom : &'a [u8], log : bool) -> Cpu<'a> {
 		Cpu {
 			regs : Regs::new(),
 			mem : Mem::new(rom),
@@ -111,7 +111,7 @@ impl<'rom> Cpu<'rom> {
 			interrupts_enabled : false,
 			last_op : 0,
 			halted : false,
-			log : std::os::args().len() > 2,
+			log : log,
 		}
 	}
 	fn ei(&mut self) {
@@ -226,7 +226,7 @@ impl<'rom> Cpu<'rom> {
 	fn push(&mut self, v : u16) {
 		self.regs.sp.v -= 2;
 		let m : [u8; 2] = [(v & 0xFF) as u8, (v >> 8) as u8];
-		self.mem.write(self.regs.sp.v, m.as_slice());
+		self.mem.write(self.regs.sp.v, &m[..]);
 	}
 	fn pop(&mut self) -> u16 {
 		let mut r = self.mem.readbyte(self.regs.sp.v) as u16;
@@ -444,7 +444,7 @@ impl<'rom> Cpu<'rom> {
 				self.set_zero_flag(false);
 			},
 			0x08 => {
-				self.mem.write(nn, self.regs.sp.to_bytes().as_slice());
+				self.mem.write(nn, &self.regs.sp.to_bytes()[..]);
 				self.regs.pc.v += 2},
 			0x09 => {let r = self.regs.hl.add(self.regs.bc.v); self.addflags16(r)},
 			0x0A => {self.regs.af.set_high(self.mem.readbyte(self.regs.bc.v))},
@@ -842,7 +842,7 @@ impl<'rom> Cpu<'rom> {
 			},
 			2 => 1,
 			_ => panic!("Unexpected IME delay")};
-		for n in range(0, 4) {
+		for n in (0..4) {
 			if !self.interrupts_enabled && !self.halted {
 				return;
 			}

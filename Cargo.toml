@@ -11,6 +11,6 @@ git = "https://github.com/brson/rust-sdl.git"
 git = "https://github.com/rust-lang/time.git"
 
 [dependencies]
-getopts = "0.1.0"
+getopts = "0.2.4"
 
 

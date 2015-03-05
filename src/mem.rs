@@ -1,5 +1,5 @@
 use std::str::from_utf8;
-use std::io::stderr;
+use std::old_io::stderr;
 
 pub struct Mem<'rom> {
 	pub mbc_type : u8,
@@ -181,7 +181,7 @@ impl<'rom> Mem<'rom> {
 		} else if offset == 0xFF02 {
 			if value == 0x81 {
 				let c : [u8; 1] = [self.mem[0xFF01]];
-				let cs = match from_utf8(c.as_slice()) {
+				let cs = match from_utf8(&c[..]) {
 					Ok(g) => g,
 					Err(_) => panic!("Couldn't decode character")
 				};
@@ -195,7 +195,7 @@ impl<'rom> Mem<'rom> {
         } else if offset == 0xFF04 {
             self.mem[0xFF04] = 0;
         } else if offset == 0xFF46 { // OAM DMA Transfer
-            for i in range(0, 100) {
+            for i in (0..100) {
                 let s = (value as usize) << 8 | i;
                 let d = 0xFE00 | i;
                 self.mem[d] = self.mem[s];
@@ -205,7 +205,7 @@ impl<'rom> Mem<'rom> {
 		}
 	}
 	pub fn write(&mut self, offset : u16, bytes : &[u8]) {
-		for i in range(0, bytes.len()) {
+		for i in (0..bytes.len()) {
 			let b = bytes[i];
 			self.writebyte(offset+i as u16, b);
 		}
