@@ -1,6 +1,5 @@
-#![feature(old_io)]
 #![feature(collections)]
-#![feature(old_path)]
+#![feature(core)]
 
 extern crate sdl;
 extern crate time;
@@ -12,8 +11,10 @@ use sdl::video::Surface;
 use sdl::video::{SurfaceFlag, VideoFlag};
 //use sdl::video::Color;
 use sdl::video::RGB;
-use std::old_io::File;
-use std::old_io::println;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::error::Error;
 use std::cmp::min;
 use std::env;
 //use getopts::{optflag,getopts,OptGroup,usage};
@@ -248,87 +249,89 @@ fn main() {
         return;
     }
     if matches.free.is_empty() {
-        println("Error: What ROM do you want to emulate?");
+        println!("Error: What ROM do you want to emulate?");
         print_usage(&program_name[..], opts);
         return;
     }
 
-	sdl::init(&[sdl::InitFlag::Video][..]);
-	sdl::wm::set_caption("rustgb", "rust-sdl");
-	//let screen : ~Surface = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
-	let screen : Box<Surface> = match sdl::video::set_video_mode(500, 500, 32,
-                                                                 &[SurfaceFlag::HWSurface][..],
-	                                                             &[VideoFlag::DoubleBuf][..]) {
-	    Ok(screen) => Box::new(screen),
-	    Err(err) => panic!("failed to set video mode: {}", err)
-	};
- 
-	let filename = &args[1][..];
-	let path = Path::new(filename);
-	let mut file = match File::open(&path) {
-		Err(why) => panic!("couldn't open {}: {}", path.display(), why.desc),
-		Ok(file) => file,
-	};
-	let result = match file.read_to_end() {
-		Ok(r) => r,
-		Err(e) => panic!("failed to read file: {}", e)
-	};
-	//let rom_contents = result.slice_to(result.len()-1);
-	let rom_contents : &[u8] = &result[..min(0x100000, result.len()-1)];
-	let game_title = match std::str::from_utf8(&rom_contents[0x134..0x143]) {
-		Ok(g) => g,
-		Err(_) => "UNKNOWN"
-	};
-	println(game_title);
-	let cart_type = rom_contents[0x147];
-	println!("cart type: {:X}", cart_type);
-	let mut cpu = Cpu::new(rom_contents, args.len() > 2);
-	//let mut start_time = current_time_millis();
-	let mut events_t = 0;
-	let mut draw_t = 0;
-	//let mut time = 0;
-	'main : loop {
-		/*
-		if time < 1000000 {
-			time += 1;
-		} else {
-			let new_time = current_time_millis();
-			// This should print something close to 1000
-			//println!("t: {}", new_time-start_time);
-			//start_time = new_time;
-			time = 0;
-		}
-		*/
-		cpu.next();
-		cpu.interrupts();
-		cpu.run_clock();
-		let lcdc = cpu.mem.readbyte(0xFF40);
-		if cpu.drawing && lcdc >> 7 == 1 {
-			cpu.drawing = false;
-			if draw_t < 10 {
-				draw_t += 1;
-			} else {
-				draw_t = 0;
-                // dereference and get pointer again ? WTF rust
-				draw(&*screen, &cpu.mem.mem[0x8000..0xA000], &cpu.mem.mem[0xFE00..0xFEA0], lcdc);
-				screen.flip();
-			}
-		}
-		if events_t < 10 {
-			events_t += 1;
-			continue;
-		}
-		events_t = 0;
-		'events : loop {
-			let e = events::events(&mut cpu);
-			match e { // Returns false on Quit event
-				1 => break 'events,
-				2 => break 'main,
-				_ => {}
-			}
-		}
-	}
-	//println!("t: {}", (current_time_millis()-start_time)/1000);
+    sdl::init(&[sdl::InitFlag::Video][..]);
+    sdl::wm::set_caption("rustgb", "rust-sdl");
+    //let screen : ~Surface = match sdl::video::set_video_mode(160, 144, 32, [sdl::video::HWSurface],
+    let screen : Box<Surface> = match sdl::video::set_video_mode(500, 500, 32,
+                                                                &[SurfaceFlag::HWSurface][..],
+                                                                    &[VideoFlag::DoubleBuf][..]) {
+        Ok(screen) => Box::new(screen),
+        Err(err) => panic!("failed to set video mode: {}", err)
+    };
+
+    let filename = &args[1][..];
+    let path = Path::new(filename);
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("couldn't open {}: {}", path.display(),
+                                                Error::description(&why)),
+        Ok(file) => file,
+    };
+    let mut buf : Vec<u8> = Vec::new();
+    match file.read_to_end(&mut buf) {
+            Ok(_) => 0,
+            Err(e) => panic!("failed to read file: {}", e)
+    };
+    //let rom_contents = result.slice_to(result.len()-1);
+    let rom_contents : &[u8] = &buf[..min(0x100000, buf.len()-1)];
+    let game_title = match std::str::from_utf8(&rom_contents[0x134..0x143]) {
+            Ok(g) => g,
+            Err(_) => "UNKNOWN"
+    };
+    println!("{}", game_title);
+    let cart_type = rom_contents[0x147];
+    println!("cart type: {:X}", cart_type);
+    let mut cpu = Cpu::new(rom_contents, args.len() > 2);
+    //let mut start_time = current_time_millis();
+    let mut events_t = 0;
+    let mut draw_t = 0;
+    //let mut time = 0;
+    'main : loop {
+        /*
+        if time < 1000000 {
+                time += 1;
+        } else {
+                let new_time = current_time_millis();
+                // This should print something close to 1000
+                //println!("t: {}", new_time-start_time);
+                //start_time = new_time;
+                time = 0;
+        }
+        */
+        cpu.next();
+        cpu.interrupts();
+        cpu.run_clock();
+        let lcdc = cpu.mem.readbyte(0xFF40);
+        if cpu.drawing && lcdc >> 7 == 1 {
+                cpu.drawing = false;
+                if draw_t < 10 {
+                        draw_t += 1;
+                } else {
+                        draw_t = 0;
+        // dereference and get pointer again ? WTF rust
+                        draw(&*screen, &cpu.mem.mem[0x8000..0xA000], &cpu.mem.mem[0xFE00..0xFEA0], lcdc);
+                        screen.flip();
+                }
+        }
+        if events_t < 10 {
+                events_t += 1;
+                continue;
+        }
+        events_t = 0;
+        'events : loop {
+                let e = events::events(&mut cpu);
+                match e { // Returns false on Quit event
+                        1 => break 'events,
+                        2 => break 'main,
+                        _ => {}
+                }
+        }
+    }
+    //println!("t: {}", (current_time_millis()-start_time)/1000);
     sdl::quit();
 }
 

@@ -1,7 +1,8 @@
 // This, like any cpu emulator, is a fucking mess.
+
 extern crate std;
 use mem::Mem;
-struct Reg {
+pub struct Reg {
 	pub v : u16
 }
 
@@ -21,44 +22,51 @@ impl Reg {
 
 	fn inc_high(&mut self) -> (u8, u8) {
 		let o = self.get_high();
-		self.set_high(o+1);
-		(o, o+1)
+		let p = o.wrapping_add(1);
+		self.set_high(p);
+		(o, p)
 	}
 	fn inc_low(&mut self) -> (u8, u8) {
 		let o = self.get_low();
-		self.set_low(o+1);
-		(o, o+1)
+		let p = o.wrapping_add(1);
+		self.set_low(p);
+		(o, p)
 	}
 	fn dec_high(&mut self) -> (u8, u8) {
 		let o = self.get_high();
-		self.set_high(o-1);
-		(o, o-1)
+		let p = o.wrapping_sub(1);
+		self.set_high(p);
+		(o, p)
 	}
 	fn dec_low(&mut self) -> (u8, u8) {
 		let o = self.get_low();
-		self.set_low(o-1);
-		(o, o-1)
+		let p = o.wrapping_sub(1);
+		self.set_low(p);
+		(o, p)
 	}
 	fn add_high(&mut self, v : u8) -> (u8, u8) {
 		let o = self.get_high();
-		self.set_high(o+v);
-		(o, o+v)
+		let p = o.wrapping_add(v);
+		self.set_high(p);
+		(o, p)
 	}
 	fn add(&mut self, v : u16) -> (u16, u16) {
 		let o = self.v;
-		self.v = o+v;
-		(o, o+v)
+		let p = o.wrapping_add(v);
+		self.v = p;
+		(o, p)
 	}
 	fn addi8(&mut self, v : i8) -> (u16, u16) {
 		let o = self.v;
-		let r = (o as i16 + v as i16) as u16;
+		let r = (Wrapping(o as i16) + Wrapping(v as i16)).0 as u16;
 		self.v = r;
 		(o, r)
 	}
 	fn sub_high(&mut self, v : u8) -> (u8, u8) {
 		let o = self.get_high();
-		self.set_high(o-v);
-		(o, o-v)
+		let p = o.wrapping_sub(v);
+		self.set_high(p);
+		(o, p)
 	}
 
 	fn to_bytes(&self) -> [u8; 2] {
@@ -66,7 +74,7 @@ impl Reg {
 	}
 }
 
-struct Regs {
+pub struct Regs {
 	pub af : Reg,
 	pub bc : Reg,
 	pub de : Reg,
@@ -321,7 +329,7 @@ impl<'rom> Cpu<'rom> {
 		self.set_zero_flag(a == v);
 		self.set_carry_flag(a < v);
 		self.set_addsub_flag(true);
-		self.set_hc_flag(a&0xf < (a-v)&0xf);
+		self.set_hc_flag(a&0xf < a.wrapping_sub(v)&0xf);
 	}
 	fn jr(&mut self, v : u8) {
 		self.regs.pc.v = (self.regs.pc.v as i16 + (v as i8) as i16) as u16 + 1;
@@ -376,7 +384,7 @@ impl<'rom> Cpu<'rom> {
 		let tclock = self.clock / 4;
         if tclock % 16 == 0 {
             let div = self.mem.readbyte(0xFF04);
-            self.mem.force_writebyte(0xFF04, div + 1);
+            self.mem.force_writebyte(0xFF04, div.wrapping_add(1));
         }
 		if tcontrol & 4 != 0 {
 			//println!("clocking");
@@ -498,20 +506,20 @@ impl<'rom> Cpu<'rom> {
 				let mut a = self.regs.af.get_high();
 				if !self.check_addsub_flag() {
 					if a > 0x99 || self.check_carry_flag() {
-						a += 0x60;
+						a = a.wrapping_add(0x60);
 						self.set_carry_flag(true);
 					}
 					if a & 0xF > 0x9 || self.check_hc_flag() {
-						a += 0x6;
+						a = a.wrapping_add(6);
 						self.set_hc_flag(false);
 					}
 				} else if self.check_carry_flag() && self.check_hc_flag() {
-					a += 0x9A;
+					a = a.wrapping_add(0x9A);
 					self.set_hc_flag(false);
 				} else if self.check_carry_flag() {
-					a += 0xA0;
+					a = a.wrapping_add(0xA0);
 				} else if self.check_hc_flag() {
-					a += 0xFA;
+					a = a.wrapping_add(0xFA);
 					self.set_hc_flag(false);
 				}
 				self.regs.af.set_high(a);
@@ -540,13 +548,15 @@ impl<'rom> Cpu<'rom> {
 			0x34 => {
 				let addr = self.regs.hl.v;
 				let a = self.mem.readbyte(addr);
-				self.mem.writebyte(addr, a+1);
-				self.incflags((a, a+1))},
+				let b = a.wrapping_add(1);
+				self.mem.writebyte(addr, b);
+				self.incflags((a, b))},
 			0x35 => {
 				let addr = self.regs.hl.v;
 				let a = self.mem.readbyte(addr);
-				self.mem.writebyte(addr, a-1);
-				self.decflags((a, a-1))},
+                                let b = a.wrapping_sub(1);
+				self.mem.writebyte(addr, b);
+				self.decflags((a, b))},
 			0x36 => {let addr = self.regs.hl.v;
 				self.mem.writebyte(addr, n);
 				self.regs.pc.v += 1},

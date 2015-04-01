@@ -1,5 +1,5 @@
-use std::str::from_utf8;
-use std::old_io::stderr;
+use std::io::stderr;
+use std::io::Write;
 
 pub struct Mem<'rom> {
 	pub mbc_type : u8,
@@ -181,12 +181,12 @@ impl<'rom> Mem<'rom> {
 		} else if offset == 0xFF02 {
 			if value == 0x81 {
 				let c : [u8; 1] = [self.mem[0xFF01]];
-				let cs = match from_utf8(&c[..]) {
-					Ok(g) => g,
-					Err(_) => panic!("Couldn't decode character")
-				};
+				//let cs = match from_utf8(&c[..]) {
+				//	Ok(g) => g,
+				//	Err(_) => panic!("Couldn't decode character")
+				//};
 				let mut stde = stderr();
-				match stde.write_str(cs) {
+				match stde.write(&c) {
 					Ok(e) => e,
 					Err(e) => panic!(e)
 				};
