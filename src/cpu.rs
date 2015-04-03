@@ -1,6 +1,7 @@
 // This, like any cpu emulator, is a fucking mess.
 
 extern crate std;
+use std::num::Wrapping;
 use mem::Mem;
 pub struct Reg {
     pub v : u16

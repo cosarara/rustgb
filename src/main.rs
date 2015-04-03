@@ -1,5 +1,4 @@
 #![feature(collections)]
-#![feature(core)]
 
 extern crate sdl;
 extern crate time;
