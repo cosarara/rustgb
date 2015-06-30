@@ -1,5 +1,3 @@
-#![feature(collections)]
-
 extern crate sdl;
 extern crate time;
 extern crate getopts;
@@ -239,7 +237,7 @@ fn main() {
     let program_name = args[0].clone();
     let mut opts = Options::new();
     opts.optflag("h", "help", "Print this help menu");
-    let matches = match opts.parse(args.tail()) {
+    let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
     };
