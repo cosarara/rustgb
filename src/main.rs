@@ -17,6 +17,7 @@ use std::env;
 //use getopts::{optflag,getopts,OptGroup,usage};
 use getopts::Options;
 use time::now_utc;
+use std::num::Wrapping;
 
 mod cpu;
 mod mem;
@@ -25,7 +26,7 @@ mod events;
 #[allow(dead_code)]
 pub fn current_time_millis() -> u64 {
     let tm = now_utc();
-    (tm.tm_sec as u64) * 1000 + (tm.tm_nsec as u64) / 1000
+    (tm.tm_sec as u64) * 1000 + (tm.tm_nsec as u64) / 1000000
 }
 
 fn putpixel(screen : &Surface, x : usize, y : usize, color : u32) {
@@ -283,37 +284,39 @@ fn main() {
     let cart_type = rom_contents[0x147];
     println!("cart type: {:X}", cart_type);
     let mut cpu = Cpu::new(rom_contents, args.len() > 2);
-    //let mut start_time = current_time_millis();
+    let mut start_time = current_time_millis();
+    let mut sec_start_time = current_time_millis();
     let mut events_t = 0;
-    let mut draw_t = 0;
-    //let mut time = 0;
+    let mut frames = 0;
     'main : loop {
-        /*
-        if time < 1000000 {
-        time += 1;
-    } else {
-        let new_time = current_time_millis();
-        // This should print something close to 1000
-        //println!("t: {}", new_time-start_time);
-        //start_time = new_time;
-        time = 0;
-    }
-         */
         cpu.next();
         cpu.interrupts();
         cpu.run_clock();
         let lcdc = cpu.mem.readbyte(0xFF40);
         if cpu.drawing && lcdc >> 7 == 1 {
             cpu.drawing = false;
-            if draw_t < 10 {
-                draw_t += 1;
-            } else {
-                draw_t = 0;
-                // dereference and get pointer again ? WTF rust
-                draw(&*screen, &cpu.mem.mem[0x8000..0xA000], &cpu.mem.mem[0xFE00..0xFEA0], lcdc);
-                screen.flip();
+
+            // Wait until it's time to draw at 60 fps
+            let mut now = current_time_millis();
+            while (Wrapping(now) - Wrapping(start_time)).0 < 17 {
+                now = current_time_millis();
+            }
+            start_time = now;
+
+            // dereference and get pointer again ? WTF rust
+            draw(&*screen, &cpu.mem.mem[0x8000..0xA000], &cpu.mem.mem[0xFE00..0xFEA0], lcdc);
+            screen.flip();
+            frames += 1;
+            let now = current_time_millis();
+            if (Wrapping(now)-Wrapping(sec_start_time)).0 > 1000 {
+                println!("fps: {}", frames);
+                frames = 0;
+                sec_start_time = current_time_millis();
             }
         }
+
+        // We can't take events every cpu cycle, since it's too slow
+        // every 10 seems ok, but it could be changed
         if events_t < 10 {
             events_t += 1;
             continue;
@@ -328,7 +331,6 @@ fn main() {
             }
         }
     }
-    //println!("t: {}", (current_time_millis()-start_time)/1000);
     sdl::quit();
 }
 
