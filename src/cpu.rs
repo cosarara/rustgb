@@ -853,7 +853,7 @@ impl<'rom> Cpu<'rom> {
 	    },
 	    2 => 1,
 	    _ => panic!("Unexpected IME delay")};
-	for n in (0..4) {
+	for n in 0..4 {
 	    if !self.interrupts_enabled && !self.halted {
 		return;
 	    }

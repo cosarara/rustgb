@@ -195,7 +195,7 @@ impl<'rom> Mem<'rom> {
         } else if offset == 0xFF04 {
             self.mem[0xFF04] = 0;
         } else if offset == 0xFF46 { // OAM DMA Transfer
-            for i in (0..100) {
+            for i in 0..100 {
                 let s = (value as usize) << 8 | i;
                 let d = 0xFE00 | i;
                 self.mem[d] = self.mem[s];
@@ -205,7 +205,7 @@ impl<'rom> Mem<'rom> {
 	}
     }
     pub fn write(&mut self, offset : u16, bytes : &[u8]) {
-	for i in (0..bytes.len()) {
+	for i in 0..bytes.len() {
 	    let b = bytes[i];
 	    self.writebyte(offset+i as u16, b);
 	}

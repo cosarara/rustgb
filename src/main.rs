@@ -44,11 +44,11 @@ fn putpixel(screen : &Surface, x : usize, y : usize, color : u32) {
 fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
     let cols = 16;
     //let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
-    for tile in (0..256) {
+    for tile in 0..256 {
 	let taddr = tile * 16 + 0x800;
-	for line in (0..8) {
+	for line in 0..8 {
 	    let laddr = (taddr + 2*line) as usize;
-	    for pixel in (0..8) {
+	    for pixel in 0..8 {
 		let c = vram[laddr] >> 7 - pixel & 1 |
 		(vram[laddr+1] >> 7 - pixel & 1) << 1;
 		putpixel(t1, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
@@ -61,11 +61,11 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 	    }
 	}
     }
-    for tile in (0..256) {
+    for tile in 0..256 {
 	let taddr = tile * 16;
-	for line in (0..8) {
+	for line in 0..8 {
 	    let laddr = (taddr + 2*line) as usize;
-	    for pixel in (0..8) {
+	    for pixel in 0..8 {
 		let c = vram[laddr] >> 7 - pixel & 1 |
 		(vram[laddr+1] >> 7 - pixel & 1) << 1;
 		putpixel(t2, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
@@ -84,7 +84,7 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
 fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface,
                 size_8x16 : bool) {
     let cols = 16 as i16;
-    for i in (0..40) {
+    for i in 0..40 {
         let base = i * 4;
         let y = oam[base] as i16 - 16;
         let x = oam[base+1] as i16 - 8;
@@ -144,8 +144,8 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
     //let t = &t1;
 
     // BG
-    for row in (0..32) {
-	for cell_n in (0..32) {
+    for row in 0..32 {
+	for cell_n in 0..32 {
 	    let addr = (base_bgmap_addr+row*32+cell_n) as usize;
             let mut tile_n : i16;
 	    if lcdc >> 4 & 1 == 0 {
@@ -166,8 +166,8 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
     // TODO - dunno what to do. kirby seems to enable it but it shouldn't
     let window_enabled = lcdc >> 5 & 1 == 1 && false;
     if window_enabled {
-        for row in (0..32) {
-            for cell_n in (0..32) {
+        for row in 0..32 {
+            for cell_n in 0..32 {
                 let addr = (base_window_addr+row*32+cell_n) as usize;
                 let mut tile_n : i16;
                 if lcdc >> 4 & 1 == 0 {
@@ -202,7 +202,7 @@ fn test_instr() {
     let mut rom = [0 as u8, ..0x200];
     rom[0x100] = 0x27;
     let mut cpu = Cpu::new(rom);
-    for i_ in (0..0xFFFF) {
+    for i_ in 0..0xFFFF {
 	let i = i_ as u16;
 	cpu.regs.af.v = i & 0xFFF0;
 	cpu.regs.bc.v = 0;
