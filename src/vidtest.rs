@@ -16,10 +16,12 @@ fn putpixel(screen : &Surface, x : uint, y : uint, color : u32) {
 }
 
 fn main() {
-    let screen : Box<Surface> = match sdl::video::set_video_mode(500, 500, 32, [sdl::video::HWSurface],
-	                                                         [sdl::video::DoubleBuf]) {
-	Ok(screen) => box screen,
-	Err(err) => fail!("failed to set video mode: {}", err)
+    let screen : Box<Surface> =
+        match sdl::video::set_video_mode(500, 500, 32,
+                                         [sdl::video::HWSurface],
+                                         [sdl::video::DoubleBuf]) {
+        Ok(screen) => box screen,
+        Err(err) => fail!("failed to set video mode: {}", err)
     };
     putpixel(screen, 5, 5, 0xAAAAAA as u32);
     'main : loop {

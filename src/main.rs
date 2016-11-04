@@ -45,38 +45,38 @@ fn make_tiles(t1 : &Surface, t2 : &Surface, vram : &[u8]) {
     let cols = 16;
     //let base_tiledata_addr = if lcdc >> 4 & 1 == 0 { 0x800 } else { 0 };
     for tile in 0..256 {
-	let taddr = tile * 16 + 0x800;
-	for line in 0..8 {
-	    let laddr = (taddr + 2*line) as usize;
-	    for pixel in 0..8 {
-		let c = vram[laddr] >> 7 - pixel & 1 |
-		(vram[laddr+1] >> 7 - pixel & 1) << 1;
-		putpixel(t1, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
-		    3 => 0 as u32,
-		    2 => 0x555555 as u32,
-		    1 => 0xAAAAAA as u32,
-		    0 => 0xFFFFFF as u32,
-		    _ => panic!("you are terminated")
-		});
-	    }
-	}
+        let taddr = tile * 16 + 0x800;
+        for line in 0..8 {
+            let laddr = (taddr + 2*line) as usize;
+            for pixel in 0..8 {
+                let c = vram[laddr] >> 7 - pixel & 1 |
+                (vram[laddr+1] >> 7 - pixel & 1) << 1;
+                putpixel(t1, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
+                    3 => 0 as u32,
+                    2 => 0x555555 as u32,
+                    1 => 0xAAAAAA as u32,
+                    0 => 0xFFFFFF as u32,
+                    _ => panic!("you are terminated")
+                });
+            }
+        }
     }
     for tile in 0..256 {
-	let taddr = tile * 16;
-	for line in 0..8 {
-	    let laddr = (taddr + 2*line) as usize;
-	    for pixel in 0..8 {
-		let c = vram[laddr] >> 7 - pixel & 1 |
-		(vram[laddr+1] >> 7 - pixel & 1) << 1;
-		putpixel(t2, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
-		    3 => 0 as u32,
-		    2 => 0x555555 as u32,
-		    1 => 0xAAAAAA as u32,
-		    0 => 0xFFFFFF as u32,
-		    _ => panic!("you are terminated")
-		});
-	    }
-	}
+        let taddr = tile * 16;
+        for line in 0..8 {
+            let laddr = (taddr + 2*line) as usize;
+            for pixel in 0..8 {
+                let c = vram[laddr] >> 7 - pixel & 1 |
+                (vram[laddr+1] >> 7 - pixel & 1) << 1;
+                putpixel(t2, (tile%cols*8+pixel) as usize, (tile/cols*8+line) as usize, match c {
+                    3 => 0 as u32,
+                    2 => 0x555555 as u32,
+                    1 => 0xAAAAAA as u32,
+                    0 => 0xFFFFFF as u32,
+                    _ => panic!("you are terminated")
+                });
+            }
+        }
     }
 }
 
@@ -119,14 +119,14 @@ fn draw_sprites(screen : &Surface, vram : &[u8], oam : &[u8], t1 : &Surface,
 
 fn draw_frame(screen : &Surface) {
     screen.fill_rect(Some(sdl::Rect {x: 0, y: 145, w: 160, h: 1}),
-		     RGB(0xFF, 0x0, 0xFF));
+                     RGB(0xFF, 0x0, 0xFF));
     screen.fill_rect(Some(sdl::Rect {x: 0, y: 257, w: 256, h: 1}),
-		     RGB(0xFF, 0x0, 0xFF));
+                     RGB(0xFF, 0x0, 0xFF));
 }
 
 fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
     screen.fill_rect(Some(sdl::Rect {x: 0, y: 0, w: 160, h: 144}),
-		     RGB(0xFF, 0xFF, 0xFF));
+                     RGB(0xFF, 0xFF, 0xFF));
     let t1 = match Surface::new(&[], 512, 512, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0) {
         Ok(s) => s,
         Err(err) => panic!("failed to create surface: {}", err)
@@ -145,21 +145,21 @@ fn draw(screen : &Surface, vram : &[u8], oam : &[u8], lcdc : u8) {
 
     // BG
     for row in 0..32 {
-	for cell_n in 0..32 {
-	    let addr = (base_bgmap_addr+row*32+cell_n) as usize;
+        for cell_n in 0..32 {
+            let addr = (base_bgmap_addr+row*32+cell_n) as usize;
             let mut tile_n : i16;
-	    if lcdc >> 4 & 1 == 0 {
+            if lcdc >> 4 & 1 == 0 {
                 //tile_n = (vram as &[i8])[addr] as i16;
                 tile_n = vram[addr] as i8 as i16;
-		tile_n += 128;
-	    } else {
+                tile_n += 128;
+            } else {
                 tile_n = vram[addr] as i16;
             }
-	    let sx = tile_n%(cols as i16)*8;
-	    let sy = tile_n/(cols as i16)*8;
-	    screen.blit_rect(t, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
-			     Some(sdl::Rect {x:(cell_n*8) as i16, y:(row*8) as i16, w:8, h:8}));
-	}
+            let sx = tile_n%(cols as i16)*8;
+            let sy = tile_n/(cols as i16)*8;
+            screen.blit_rect(t, Some(sdl::Rect {x:sx, y:sy, w:8, h:8}),
+                             Some(sdl::Rect {x:(cell_n*8) as i16, y:(row*8) as i16, w:8, h:8}));
+        }
     }
 
     // Window
@@ -203,27 +203,27 @@ fn test_instr() {
     rom[0x100] = 0x27;
     let mut cpu = Cpu::new(rom);
     for i_ in 0..0xFFFF {
-	let i = i_ as u16;
-	cpu.regs.af.v = i & 0xFFF0;
-	cpu.regs.bc.v = 0;
-	//cpu.regs.af.v = (i << 8 | 1 << 4);
-	//cpu.regs.bc.v = (i & 0xFF00);
-	println!("input: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
-	cpu.next();
-	//let line = lines[i as usize].clone();
-	//let mut it = line.split_str(",");
-	//let afs = it.next().unwrap();
-	//let bcs_t = it.next().unwrap();
-	//let bcs = bcs_t.slice_to(bcs_t.len()-1);
-	//let afo : Option<u16> = num::from_str_radix(afs, 16);
-	//let af = afo.unwrap();
-	//let bco : Option<u16> = num::from_str_radix(bcs, 16);
-	//let bc = bco.unwrap();
-	//println!("output js: {:04X}, {:04X}", af, bc);
-	//println!("output rust: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
-	//assert!(cpu.regs.af.v == af);
-	//assert!(cpu.regs.bc.v == bc);
-	//cpu.regs.pc.v = 0x100;
+        let i = i_ as u16;
+        cpu.regs.af.v = i & 0xFFF0;
+        cpu.regs.bc.v = 0;
+        //cpu.regs.af.v = (i << 8 | 1 << 4);
+        //cpu.regs.bc.v = (i & 0xFF00);
+        println!("input: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
+        cpu.next();
+        //let line = lines[i as usize].clone();
+        //let mut it = line.split_str(",");
+        //let afs = it.next().unwrap();
+        //let bcs_t = it.next().unwrap();
+        //let bcs = bcs_t.slice_to(bcs_t.len()-1);
+        //let afo : Option<u16> = num::from_str_radix(afs, 16);
+        //let af = afo.unwrap();
+        //let bco : Option<u16> = num::from_str_radix(bcs, 16);
+        //let bc = bco.unwrap();
+        //println!("output js: {:04X}, {:04X}", af, bc);
+        //println!("output rust: {:04X}, {:04X}", cpu.regs.af.v, cpu.regs.bc.v);
+        //assert!(cpu.regs.af.v == af);
+        //assert!(cpu.regs.bc.v == bc);
+        //cpu.regs.pc.v = 0x100;
     }
 }
 
