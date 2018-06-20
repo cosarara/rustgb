@@ -24,7 +24,7 @@ mod mem;
 mod events;
 
 #[allow(dead_code)]
-pub fn current_time_millis() -> u64 {
+fn current_time_millis() -> u64 {
     let tm = now_utc();
     (tm.tm_sec as u64) * 1000 + (tm.tm_nsec as u64) / 1000000
 }
